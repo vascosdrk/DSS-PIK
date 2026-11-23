@@ -73,3 +73,14 @@ reports/
 tambahan/
 vendor/
 *.parquet
+
+# Phase 8.5 — Keys, certificates, and local DB files
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+*.sqlite
+*.sqlite3
+*.db
