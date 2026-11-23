@@ -1,0 +1,479 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sih3.kepriprov.go.id/schemas/sih3_regional_warning.schema.json",
+  "title": "DSS-PIK Standardized Decision-Based Climate Warning Publication Schema",
+  "description": "Standar pertukaran data peringatan dini iklim berbasis keputusan tingkat kecamatan (59 kecamatan) dan kabupaten/kota (7 wilayah) dari DSS-PIK BMKG Stasiun Meteorologi Kelas II Raja Haji Fisabilillah Tanjungpinang.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "system",
+    "institution",
+    "publication",
+    "source",
+    "generated_at",
+    "period",
+    "province",
+    "kecamatan",
+    "regions"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0.0",
+      "description": "Versi skema kontrak JSON DSS-PIK."
+    },
+    "system": {
+      "type": "string",
+      "const": "DSS-PIK",
+      "description": "Kode sistem penerbit."
+    },
+    "institution": {
+      "type": "string",
+      "const": "BMKG Stasiun Meteorologi Kelas II Raja Haji Fisabilillah Tanjungpinang",
+      "description": "Institusi penerbit peringatan dini resmi (Single Source of Truth)."
+    },
+    "publication": {
+      "type": "object",
+      "required": [
+        "publication_id",
+        "revision",
+        "status",
+        "generated_at",
+        "published_at",
+        "valid_from",
+        "valid_until",
+        "approved_by",
+        "published_by",
+        "revision_reason"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "publication_id": {
+          "type": "string",
+          "pattern": "^DSSPIK-[0-9]{8}-[0-9]{3}$",
+          "description": "ID publikasi unik dengan format DSSPIK-YYYYMMDD-NNN."
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Nomor revisi publikasi (mulai dari 1)."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Aktif", "DRAFT", "REVIEW", "APPROVED", "PUBLISHED", "EXPIRED"],
+          "description": "Status publikasi aktual."
+        },
+        "generated_at": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$",
+          "description": "Waktu pembuatan dokumen JSON dalam ISO-8601 (WIB)."
+        },
+        "published_at": {
+          "type": ["string", "null"],
+          "description": "Waktu penerbitan resmi dalam ISO-8601 (WIB), bernilai null jika belum PUBLISHED."
+        },
+        "valid_from": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "description": "Tanggal mulai berlaku peringatan (YYYY-MM-DD)."
+        },
+        "valid_until": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "description": "Tanggal akhir berlaku peringatan (YYYY-MM-DD)."
+        },
+        "approved_by": {
+          "type": ["string", "null"]
+        },
+        "published_by": {
+          "type": ["string", "null"]
+        },
+        "revision_reason": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "period_id",
+        "evaluation_period",
+        "observation_cutoff_date",
+        "forecast_issue_date",
+        "spi_reference_date",
+        "institution",
+        "system"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "period_id": {
+          "type": "string"
+        },
+        "evaluation_period": {
+          "type": "string",
+          "minLength": 3
+        },
+        "observation_cutoff_date": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "forecast_issue_date": {
+          "type": ["string", "null"]
+        },
+        "spi_reference_date": {
+          "type": ["string", "null"]
+        },
+        "institution": {
+          "type": "string",
+          "const": "BMKG Stasiun Meteorologi Kelas II Raja Haji Fisabilillah Tanjungpinang"
+        },
+        "system": {
+          "type": "string",
+          "const": "DSS-PIK"
+        }
+      }
+    },
+    "generated_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$"
+    },
+    "period": {
+      "type": "object",
+      "required": [
+        "resolution",
+        "year",
+        "month",
+        "dasarian",
+        "label",
+        "valid_from",
+        "valid_until"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "resolution": { "type": "string" },
+        "year": { "type": "integer" },
+        "month": { "type": "integer", "minimum": 1, "maximum": 12 },
+        "dasarian": { "type": "integer", "minimum": 1, "maximum": 3 },
+        "label": { "type": "string" },
+        "valid_from": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+        "valid_until": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
+      }
+    },
+    "province": {
+      "type": "object",
+      "required": ["code", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "code": { "type": "string" },
+        "name": { "type": "string" }
+      }
+    },
+    "kecamatan": {
+      "type": "array",
+      "minItems": 59,
+      "maxItems": 59,
+      "description": "Daftar tepat 59 kecamatan di Provinsi Kepulauan Riau.",
+      "items": {
+        "type": "object",
+        "required": [
+          "kecamatan_id",
+          "kecamatan_name",
+          "kabkot",
+          "parent_polygon_key",
+          "stations_count",
+          "inherited_from_parent",
+          "overall_status",
+          "warnings",
+          "hazard_assessments",
+          "recommendations",
+          "final_decision"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "kecamatan_id": { "type": "string" },
+          "kecamatan_name": { "type": "string" },
+          "kabkot": { "type": "string" },
+          "parent_polygon_key": {
+            "type": "string",
+            "enum": [
+              "BINTAN",
+              "KARIMUN",
+              "NATUNA",
+              "LINGGA",
+              "KEPULAUAN ANAMBAS",
+              "KOTA BATAM",
+              "KOTA TANJUNGPINANG"
+            ]
+          },
+          "stations_count": { "type": "integer", "minimum": 0 },
+          "inherited_from_parent": { "type": "boolean" },
+          "overall_status": {
+            "type": "string",
+            "enum": ["AMAN", "WASPADA", "SIAGA", "AWAS", "INSUFFICIENT_DATA"]
+          },
+          "warnings": {
+            "type": "array",
+            "maxItems": 2,
+            "items": { "$ref": "#/$defs/activeWarning" }
+          },
+          "hazard_assessments": {
+            "type": "object",
+            "required": ["PDKM", "PDCHT"],
+            "additionalProperties": false,
+            "properties": {
+              "PDKM": { "$ref": "#/$defs/hazardAssessmentDetail" },
+              "PDCHT": { "$ref": "#/$defs/hazardAssessmentDetail" }
+            }
+          },
+          "recommendations": { "$ref": "#/$defs/recommendationsBlock" },
+          "final_decision": { "$ref": "#/$defs/finalDecision" }
+        }
+      }
+    },
+    "regions": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "description": "Daftar tepat 7 wilayah administrasi Kabupaten/Kota di Provinsi Kepulauan Riau.",
+      "items": {
+        "type": "object",
+        "required": [
+          "region_code",
+          "region_name",
+          "sih3_polygon_key",
+          "data_status",
+          "overall_region_status",
+          "station_coverage",
+          "warnings",
+          "hazard_assessments",
+          "data_coverage",
+          "recommendations",
+          "final_decision",
+          "operator_decision"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "region_code": {
+            "type": "string",
+            "enum": ["21.01", "21.02", "21.03", "21.04", "21.05", "21.71", "21.72"]
+          },
+          "region_name": {
+            "type": "string",
+            "enum": [
+              "Kabupaten Bintan",
+              "Kabupaten Karimun",
+              "Kabupaten Natuna",
+              "Kabupaten Lingga",
+              "Kabupaten Kepulauan Anambas",
+              "Kota Batam",
+              "Kota Tanjungpinang"
+            ]
+          },
+          "sih3_polygon_key": {
+            "type": "string",
+            "enum": [
+              "BINTAN",
+              "KARIMUN",
+              "NATUNA",
+              "LINGGA",
+              "KEPULAUAN ANAMBAS",
+              "KOTA BATAM",
+              "KOTA TANJUNGPINANG"
+            ]
+          },
+          "data_status": {
+            "type": "string",
+            "enum": ["COMPLETE", "PARTIAL", "INSUFFICIENT_DATA"]
+          },
+          "overall_region_status": {
+            "type": "string",
+            "enum": ["AMAN", "WASPADA", "SIAGA", "AWAS", "INSUFFICIENT_DATA"]
+          },
+          "station_coverage": {
+            "type": "object",
+            "required": ["total", "manual_stations", "arg_stations", "valid", "missing", "percentage"],
+            "additionalProperties": false,
+            "properties": {
+              "total": { "type": "integer", "minimum": 0 },
+              "manual_stations": { "type": "integer", "minimum": 0 },
+              "arg_stations": { "type": "integer", "minimum": 0 },
+              "valid": { "type": "integer", "minimum": 0 },
+              "missing": { "type": "integer", "minimum": 0 },
+              "percentage": { "type": "number", "minimum": 0.0, "maximum": 100.0 }
+            }
+          },
+          "warnings": {
+            "type": "array",
+            "maxItems": 2,
+            "items": { "$ref": "#/$defs/activeWarning" }
+          },
+          "hazard_assessments": {
+            "type": "object",
+            "required": ["PDKM", "PDCHT"],
+            "additionalProperties": false,
+            "properties": {
+              "PDKM": { "$ref": "#/$defs/hazardAssessmentDetail" },
+              "PDCHT": { "$ref": "#/$defs/hazardAssessmentDetail" }
+            }
+          },
+          "data_coverage": {
+            "type": "object",
+            "required": ["total_stations", "valid_stations", "coverage_percent", "coverage_percentage", "status"],
+            "additionalProperties": false,
+            "properties": {
+              "total_stations": { "type": "integer", "minimum": 0 },
+              "valid_stations": { "type": "integer", "minimum": 0 },
+              "coverage_percent": { "type": "number", "minimum": 0.0, "maximum": 100.0 },
+              "coverage_percentage": { "type": "number", "minimum": 0.0, "maximum": 100.0 },
+              "status": { "type": "string", "enum": ["SUFFICIENT", "INSUFFICIENT_DATA"] }
+            }
+          },
+          "recommendations": { "$ref": "#/$defs/recommendationsBlock" },
+          "final_decision": { "$ref": "#/$defs/finalDecision" },
+          "operator_decision": {
+            "type": "object",
+            "required": ["decision_source", "override_reason"],
+            "additionalProperties": false,
+            "properties": {
+              "decision_source": {
+                "type": "string",
+                "enum": ["DSS_RECOMMENDATION", "OPERATOR_OVERRIDE", "NO_ACTIVE_WARNING"]
+              },
+              "override_reason": { "type": ["string", "null"] }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "activeWarning": {
+      "type": "object",
+      "required": [
+        "hazard_code",
+        "hazard_name",
+        "recommended_level",
+        "final_level",
+        "decision_source",
+        "operator_override",
+        "override_reason",
+        "narrative"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "hazard_code": { "type": "string", "enum": ["PDKM", "PDCHT"] },
+        "hazard_name": { "type": "string", "enum": ["Kekeringan Meteorologis", "Curah Hujan Tinggi"] },
+        "recommended_level": { "type": "string", "enum": ["AMAN", "WASPADA", "SIAGA", "AWAS", "INSUFFICIENT_DATA"] },
+        "final_level": { "type": "string", "enum": ["WASPADA", "SIAGA", "AWAS"] },
+        "decision_source": { "type": "string", "enum": ["DSS_RECOMMENDATION", "OPERATOR_OVERRIDE", "NO_ACTIVE_WARNING"] },
+        "operator_override": { "type": "boolean" },
+        "override_reason": { "type": ["string", "null"] },
+        "narrative": { "type": "string", "minLength": 1 }
+      }
+    },
+    "hazardAssessmentDetail": {
+      "type": "object",
+      "required": [
+        "hazard_code",
+        "hazard_name",
+        "recommended_level",
+        "final_level",
+        "decision_source",
+        "operator_override",
+        "override_reason",
+        "narrative"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "hazard_code": { "type": "string", "enum": ["PDKM", "PDCHT"] },
+        "hazard_name": { "type": "string", "enum": ["Kekeringan Meteorologis", "Curah Hujan Tinggi"] },
+        "recommended_level": { "type": "string", "enum": ["AMAN", "WASPADA", "SIAGA", "AWAS", "INSUFFICIENT_DATA"] },
+        "final_level": { "type": "string", "enum": ["AMAN", "WASPADA", "SIAGA", "AWAS", "INSUFFICIENT_DATA"] },
+        "decision_source": { "type": "string", "enum": ["DSS_RECOMMENDATION", "OPERATOR_OVERRIDE", "NO_ACTIVE_WARNING"] },
+        "operator_override": { "type": "boolean" },
+        "override_reason": { "type": ["string", "null"] },
+        "narrative": { "type": "string" }
+      }
+    },
+    "triggeredCondition": {
+      "type": "object",
+      "required": [
+        "indicator",
+        "value",
+        "unit",
+        "operator",
+        "threshold",
+        "period",
+        "station_code",
+        "station_name",
+        "description"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "indicator": { "type": "string" },
+        "value": { "type": ["number", "null"] },
+        "unit": { "type": ["string", "null"] },
+        "operator": { "type": ["string", "null"] },
+        "threshold": { "type": ["number", "null"] },
+        "period": { "type": ["string", "null"] },
+        "station_code": { "type": ["string", "null"] },
+        "station_name": { "type": ["string", "null"] },
+        "description": { "type": ["string", "null"] }
+      }
+    },
+    "recommendationsBlock": {
+      "type": "object",
+      "required": ["PDKM", "PDCHT"],
+      "additionalProperties": false,
+      "properties": {
+        "PDKM": {
+          "type": "object",
+          "required": ["level", "triggered_conditions"],
+          "additionalProperties": false,
+          "properties": {
+            "level": { "type": "string", "enum": ["AMAN", "WASPADA", "SIAGA", "AWAS", "INSUFFICIENT_DATA"] },
+            "triggered_conditions": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/triggeredCondition" }
+            }
+          }
+        },
+        "PDCHT": {
+          "type": "object",
+          "required": ["level", "triggered_conditions"],
+          "additionalProperties": false,
+          "properties": {
+            "level": { "type": "string", "enum": ["AMAN", "WASPADA", "SIAGA", "AWAS", "INSUFFICIENT_DATA"] },
+            "triggered_conditions": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/triggeredCondition" }
+            }
+          }
+        }
+      }
+    },
+    "finalDecision": {
+      "type": "object",
+      "required": [
+        "warning_type",
+        "level",
+        "status",
+        "is_override",
+        "override_reason",
+        "operator",
+        "decided_at"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "warning_type": { "type": ["string", "null"], "enum": ["PDKM", "PDCHT", "MULTI_HAZARD", null] },
+        "level": { "type": "string", "enum": ["AMAN", "WASPADA", "SIAGA", "AWAS", "INSUFFICIENT_DATA"] },
+        "status": { "type": "string", "enum": ["ACTIVE", "NONE", "INSUFFICIENT_DATA"] },
+        "is_override": { "type": "boolean" },
+        "override_reason": { "type": ["string", "null"] },
+        "operator": { "type": ["string", "null"] },
+        "decided_at": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

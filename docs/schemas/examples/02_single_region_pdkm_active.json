@@ -1,0 +1,386 @@
+{
+  "schema_version": "1.0.0",
+  "system": "DSS-PIK",
+  "publication": {
+    "publication_id": "DSSPIK-20260910-002",
+    "revision": 1,
+    "status": "PUBLISHED",
+    "generated_at": "2026-09-10T08:10:00+07:00",
+    "published_at": "2026-09-10T08:15:00+07:00",
+    "valid_from": "2026-09-11",
+    "valid_until": "2026-09-20",
+    "approved_by": "koordinator_datin_tpi",
+    "published_by": "forecaster_tpi",
+    "revision_reason": null
+  },
+  "source": {
+    "period_id": "2026-09-das2",
+    "evaluation_period": "Dasarian II September 2026",
+    "observation_cutoff_date": "2026-09-10",
+    "forecast_issue_date": "2026-08-01",
+    "spi_reference_date": "2026-09-10",
+    "institution": "BMKG Stasiun Meteorologi Kelas II Raja Haji Fisabilillah Tanjungpinang",
+    "system": "DSS-PIK"
+  },
+  "regions": [
+    {
+      "region_code": "21.01",
+      "bps_code_compact": "2101",
+      "sih3_polygon_key": "BINTAN",
+      "mapping_validation_status": "VERIFIED_GDB_AND_BPS",
+      "region_name": "Kabupaten Bintan",
+      "data_status": "COMPLETE",
+      "overall_region_status": "SIAGA",
+      "station_coverage": {
+        "total": 6,
+        "manual_stations": 5,
+        "arg_stations": 1,
+        "valid": 6,
+        "missing": 0,
+        "percentage": 100.0
+      },
+      "hazard_assessments": {
+        "PDKM": {
+          "hazard_code": "PDKM",
+          "hazard_name": "Kekeringan Meteorologis",
+          "recommended_level": "SIAGA",
+          "final_level": "SIAGA",
+          "decision_source": "DSS_RECOMMENDATION",
+          "operator_override": false,
+          "override_reason": null,
+          "analysis_notes": null,
+          "decided_by": "forecaster_tpi",
+          "decided_at": "2026-09-10 08:00:00",
+          "narrative": "Peringatan Dini Kekeringan Meteorologis (PDKM) level SIAGA di Kabupaten Bintan (dipicu oleh 2 pos hujan: Kijang, Tambelan)."
+        },
+        "PDCHT": {
+          "hazard_code": "PDCHT",
+          "hazard_name": "Curah Hujan Tinggi",
+          "recommended_level": "AMAN",
+          "final_level": "AMAN",
+          "decision_source": "DSS_RECOMMENDATION",
+          "operator_override": false,
+          "override_reason": null,
+          "analysis_notes": null,
+          "decided_by": "forecaster_tpi",
+          "decided_at": "2026-09-10 08:00:00",
+          "narrative": "Kondisi curah hujan tinggi (PDCHT) di wilayah Kabupaten Bintan berada pada kategori AMAN."
+        }
+      },
+      "warnings": [
+        {
+          "hazard_code": "PDKM",
+          "hazard_name": "Kekeringan Meteorologis",
+          "recommended_level": "SIAGA",
+          "final_level": "SIAGA",
+          "color_hex": "#E69138",
+          "decision_source": "DSS_RECOMMENDATION",
+          "operator_override": false,
+          "override_reason": null,
+          "analysis_notes": null,
+          "decided_by": "forecaster_tpi",
+          "decided_at": "2026-09-10 08:00:00",
+          "triggering_stations": [
+            {
+              "station_id": "210101",
+              "station_name": "Kijang",
+              "level": "SIAGA",
+              "indicators": [
+                "HTH: 34 hari",
+                "SPI-30D: -1.62",
+                "Prob CH<20mm Dasarian: 78.4%"
+              ]
+            },
+            {
+              "station_id": "210105",
+              "station_name": "Tambelan",
+              "level": "WASPADA",
+              "indicators": [
+                "HTH: 24 hari",
+                "SPI-30D: -1.18",
+                "Prob CH<20mm Dasarian: 74.0%"
+              ]
+            }
+          ],
+          "narrative": "Peringatan Dini Kekeringan Meteorologis (PDKM) level SIAGA di Kabupaten Bintan (dipicu oleh 2 pos hujan: Kijang, Tambelan)."
+        }
+      ]
+    },
+    {
+      "region_code": "21.02",
+      "bps_code_compact": "2102",
+      "sih3_polygon_key": "KARIMUN",
+      "mapping_validation_status": "VERIFIED_GDB_AND_BPS",
+      "region_name": "Kabupaten Karimun",
+      "data_status": "COMPLETE",
+      "overall_region_status": "AMAN",
+      "station_coverage": {
+        "total": 10,
+        "manual_stations": 9,
+        "arg_stations": 1,
+        "valid": 10,
+        "missing": 0,
+        "percentage": 100.0
+      },
+      "hazard_assessments": {
+        "PDKM": {
+          "hazard_code": "PDKM",
+          "hazard_name": "Kekeringan Meteorologis",
+          "recommended_level": "AMAN",
+          "final_level": "AMAN",
+          "decision_source": "DSS_RECOMMENDATION",
+          "operator_override": false,
+          "override_reason": null,
+          "analysis_notes": null,
+          "decided_by": "forecaster_tpi",
+          "decided_at": "2026-09-10 08:00:00",
+          "narrative": "Kondisi kekeringan meteorologis (PDKM) di wilayah Kabupaten Karimun berada pada kategori AMAN."
+        },
+        "PDCHT": {
+          "hazard_code": "PDCHT",
+          "hazard_name": "Curah Hujan Tinggi",
+          "recommended_level": "AMAN",
+          "final_level": "AMAN",
+          "decision_source": "DSS_RECOMMENDATION",
+          "operator_override": false,
+          "override_reason": null,
+          "analysis_notes": null,
+          "decided_by": "forecaster_tpi",
+          "decided_at": "2026-09-10 08:00:00",
+          "narrative": "Kondisi curah hujan tinggi (PDCHT) di wilayah Kabupaten Karimun berada pada kategori AMAN."
+        }
+      },
+      "warnings": []
+    },
+    {
+      "region_code": "21.03",
+      "bps_code_compact": "2103",
+      "sih3_polygon_key": "NATUNA",
+      "mapping_validation_status": "VERIFIED_GDB_AND_BPS",
+      "region_name": "Kabupaten Natuna",
+      "data_status": "COMPLETE",
+      "overall_region_status": "AMAN",
+      "station_coverage": {
+        "total": 7,
+        "manual_stations": 6,
+        "arg_stations": 1,
+        "valid": 7,
+        "missing": 0,
+        "percentage": 100.0
+      },
+      "hazard_assessments": {
+        "PDKM": {
+          "hazard_code": "PDKM",
+          "hazard_name": "Kekeringan Meteorologis",
+          "recommended_level": "AMAN",
+          "final_level": "AMAN",
+          "decision_source": "DSS_RECOMMENDATION",
+          "operator_override": false,
+          "override_reason": null,
+          "analysis_notes": null,
+          "decided_by": "forecaster_tpi",
+          "decided_at": "2026-09-10 08:00:00",
+          "narrative": "Kondisi kekeringan meteorologis (PDKM) di wilayah Kabupaten Natuna berada pada kategori AMAN."
+        },
+        "PDCHT": {
+          "hazard_code": "PDCHT",
+          "hazard_name": "Curah Hujan Tinggi",
+          "recommended_level": "AMAN",
+          "final_level": "AMAN",
+          "decision_source": "DSS_RECOMMENDATION",
+          "operator_override": false,
+          "override_reason": null,
+          "analysis_notes": null,
+          "decided_by": "forecaster_tpi",
+          "decided_at": "2026-09-10 08:00:00",
+          "narrative": "Kondisi curah hujan tinggi (PDCHT) di wilayah Kabupaten Natuna berada pada kategori AMAN."
+        }
+      },
+      "warnings": []
+    },
+    {
+      "region_code": "21.04",
+      "bps_code_compact": "2104",
+      "sih3_polygon_key": "LINGGA",
+      "mapping_validation_status": "VERIFIED_GDB_AND_BPS",
+      "region_name": "Kabupaten Lingga",
+      "data_status": "COMPLETE",
+      "overall_region_status": "AMAN",
+      "station_coverage": {
+        "total": 15,
+        "manual_stations": 14,
+        "arg_stations": 1,
+        "valid": 15,
+        "missing": 0,
+        "percentage": 100.0
+      },
+      "hazard_assessments": {
+        "PDKM": {
+          "hazard_code": "PDKM",
+          "hazard_name": "Kekeringan Meteorologis",
+          "recommended_level": "AMAN",
+          "final_level": "AMAN",
+          "decision_source": "DSS_RECOMMENDATION",
+          "operator_override": false,
+          "override_reason": null,
+          "analysis_notes": null,
+          "decided_by": "forecaster_tpi",
+          "decided_at": "2026-09-10 08:00:00",
+          "narrative": "Kondisi kekeringan meteorologis (PDKM) di wilayah Kabupaten Lingga berada pada kategori AMAN."
+        },
+        "PDCHT": {
+          "hazard_code": "PDCHT",
+          "hazard_name": "Curah Hujan Tinggi",
+          "recommended_level": "AMAN",
+          "final_level": "AMAN",
+          "decision_source": "DSS_RECOMMENDATION",
+          "operator_override": false,
+          "override_reason": null,
+          "analysis_notes": null,
+          "decided_by": "forecaster_tpi",
+          "decided_at": "2026-09-10 08:00:00",
+          "narrative": "Kondisi curah hujan tinggi (PDCHT) di wilayah Kabupaten Lingga berada pada kategori AMAN."
+        }
+      },
+      "warnings": []
+    },
+    {
+      "region_code": "21.05",
+      "bps_code_compact": "2105",
+      "sih3_polygon_key": "KEPULAUAN ANAMBAS",
+      "mapping_validation_status": "VERIFIED_GDB_AND_BPS",
+      "region_name": "Kabupaten Kepulauan Anambas",
+      "data_status": "COMPLETE",
+      "overall_region_status": "AMAN",
+      "station_coverage": {
+        "total": 4,
+        "manual_stations": 3,
+        "arg_stations": 1,
+        "valid": 4,
+        "missing": 0,
+        "percentage": 100.0
+      },
+      "hazard_assessments": {
+        "PDKM": {
+          "hazard_code": "PDKM",
+          "hazard_name": "Kekeringan Meteorologis",
+          "recommended_level": "AMAN",
+          "final_level": "AMAN",
+          "decision_source": "DSS_RECOMMENDATION",
+          "operator_override": false,
+          "override_reason": null,
+          "analysis_notes": null,
+          "decided_by": "forecaster_tpi",
+          "decided_at": "2026-09-10 08:00:00",
+          "narrative": "Kondisi kekeringan meteorologis (PDKM) di wilayah Kabupaten Kepulauan Anambas berada pada kategori AMAN."
+        },
+        "PDCHT": {
+          "hazard_code": "PDCHT",
+          "hazard_name": "Curah Hujan Tinggi",
+          "recommended_level": "AMAN",
+          "final_level": "AMAN",
+          "decision_source": "DSS_RECOMMENDATION",
+          "operator_override": false,
+          "override_reason": null,
+          "analysis_notes": null,
+          "decided_by": "forecaster_tpi",
+          "decided_at": "2026-09-10 08:00:00",
+          "narrative": "Kondisi curah hujan tinggi (PDCHT) di wilayah Kabupaten Kepulauan Anambas berada pada kategori AMAN."
+        }
+      },
+      "warnings": []
+    },
+    {
+      "region_code": "21.71",
+      "bps_code_compact": "2171",
+      "sih3_polygon_key": "KOTA BATAM",
+      "mapping_validation_status": "VERIFIED_GDB_AND_BPS",
+      "region_name": "Kota Batam",
+      "data_status": "COMPLETE",
+      "overall_region_status": "AMAN",
+      "station_coverage": {
+        "total": 8,
+        "manual_stations": 7,
+        "arg_stations": 1,
+        "valid": 8,
+        "missing": 0,
+        "percentage": 100.0
+      },
+      "hazard_assessments": {
+        "PDKM": {
+          "hazard_code": "PDKM",
+          "hazard_name": "Kekeringan Meteorologis",
+          "recommended_level": "AMAN",
+          "final_level": "AMAN",
+          "decision_source": "DSS_RECOMMENDATION",
+          "operator_override": false,
+          "override_reason": null,
+          "analysis_notes": null,
+          "decided_by": "forecaster_tpi",
+          "decided_at": "2026-09-10 08:00:00",
+          "narrative": "Kondisi kekeringan meteorologis (PDKM) di wilayah Kota Batam berada pada kategori AMAN."
+        },
+        "PDCHT": {
+          "hazard_code": "PDCHT",
+          "hazard_name": "Curah Hujan Tinggi",
+          "recommended_level": "AMAN",
+          "final_level": "AMAN",
+          "decision_source": "DSS_RECOMMENDATION",
+          "operator_override": false,
+          "override_reason": null,
+          "analysis_notes": null,
+          "decided_by": "forecaster_tpi",
+          "decided_at": "2026-09-10 08:00:00",
+          "narrative": "Kondisi curah hujan tinggi (PDCHT) di wilayah Kota Batam berada pada kategori AMAN."
+        }
+      },
+      "warnings": []
+    },
+    {
+      "region_code": "21.72",
+      "bps_code_compact": "2172",
+      "sih3_polygon_key": "KOTA TANJUNGPINANG",
+      "mapping_validation_status": "VERIFIED_GDB_AND_BPS",
+      "region_name": "Kota Tanjungpinang",
+      "data_status": "COMPLETE",
+      "overall_region_status": "AMAN",
+      "station_coverage": {
+        "total": 7,
+        "manual_stations": 6,
+        "arg_stations": 1,
+        "valid": 7,
+        "missing": 0,
+        "percentage": 100.0
+      },
+      "hazard_assessments": {
+        "PDKM": {
+          "hazard_code": "PDKM",
+          "hazard_name": "Kekeringan Meteorologis",
+          "recommended_level": "AMAN",
+          "final_level": "AMAN",
+          "decision_source": "DSS_RECOMMENDATION",
+          "operator_override": false,
+          "override_reason": null,
+          "analysis_notes": null,
+          "decided_by": "forecaster_tpi",
+          "decided_at": "2026-09-10 08:00:00",
+          "narrative": "Kondisi kekeringan meteorologis (PDKM) di wilayah Kota Tanjungpinang berada pada kategori AMAN."
+        },
+        "PDCHT": {
+          "hazard_code": "PDCHT",
+          "hazard_name": "Curah Hujan Tinggi",
+          "recommended_level": "AMAN",
+          "final_level": "AMAN",
+          "decision_source": "DSS_RECOMMENDATION",
+          "operator_override": false,
+          "override_reason": null,
+          "analysis_notes": null,
+          "decided_by": "forecaster_tpi",
+          "decided_at": "2026-09-10 08:00:00",
+          "narrative": "Kondisi curah hujan tinggi (PDCHT) di wilayah Kota Tanjungpinang berada pada kategori AMAN."
+        }
+      },
+      "warnings": []
+    }
+  ]
+}

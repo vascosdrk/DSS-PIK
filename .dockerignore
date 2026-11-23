@@ -1,0 +1,50 @@
+# ==============================================================================
+# DSS-PIK .dockerignore — Keep secrets, dumps, caches & large data out of images
+# ==============================================================================
+
+# Secrets & local environment files
+.env
+.env.*
+!.env.example
+!.env.docker.example
+*.bak_*
+
+# Python virtual environments & caches
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Frontend local dependencies & build caches (rebuilt cleanly in Stage 1)
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.env*
+frontend/vite.config.js.timestamp-*
+
+# Database dumps, backups & releases (NEVER bake into images)
+backups/
+releases/
+*.sql
+*.zip
+
+# Large operational & reference datasets (mounted persistently at runtime)
+data/
+outputs/
+reports/
+logs/
+scratch/
+tambahan/
+vendor/
+
+# VCS, IDE & documentation
+.git/
+.gitignore
+.agents/
+docs/
+*.md
+test_*.py
+DSS-PIK.bat
+*.bat

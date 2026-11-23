@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 260" width="100%" height="100%" fill="none">
+  <defs>
+    <!-- Sky & Radar Glow -->
+    <linearGradient id="skyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0284c7" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#0d9488" stop-opacity="0.08"/>
+    </linearGradient>
+    <radialGradient id="radarPulse" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.4"/>
+      <stop offset="70%" stop-color="#0284c7" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#0369a1" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="skinGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fed7aa"/>
+      <stop offset="100%" stop-color="#fcd34d"/>
+    </linearGradient>
+    <linearGradient id="uniformGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f2744"/>
+      <stop offset="100%" stop-color="#1e4b82"/>
+    </linearGradient>
+    <linearGradient id="vestGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0284c7"/>
+      <stop offset="100%" stop-color="#0369a1"/>
+    </linearGradient>
+    <linearGradient id="hairGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background Decorative Radar / Geo Grid -->
+  <rect x="10" y="10" width="300" height="240" rx="16" fill="url(#skyGrad)" stroke="#e0f2fe" stroke-width="1.5"/>
+  <circle cx="230" cy="70" r="50" fill="url(#radarPulse)"/>
+  <circle cx="230" cy="70" r="35" fill="none" stroke="#38bdf8" stroke-width="1" stroke-dasharray="3,3" opacity="0.6"/>
+  <circle cx="230" cy="70" r="20" fill="none" stroke="#0ea5e9" stroke-width="1" opacity="0.4"/>
+  <line x1="230" y1="20" x2="230" y2="120" stroke="#38bdf8" stroke-width="1" opacity="0.3"/>
+  <line x1="180" y1="70" x2="280" y2="70" stroke="#38bdf8" stroke-width="1" opacity="0.3"/>
+
+  <!-- Satellite / Rain Cloud Friendly Floating Elements -->
+  <!-- Cloud 1 -->
+  <g opacity="0.85" transform="translate(40, 30) scale(0.65)">
+    <path d="M20,35 Q20,15 40,15 Q50,0 75,10 Q95,0 110,20 Q125,20 125,35 Q125,50 105,50 L25,50 Q15,50 20,35 Z" fill="#ffffff" filter="drop-shadow(0 2px 4px rgba(14,165,233,0.15))"/>
+    <!-- Small Rain/Sun Accent -->
+    <circle cx="85" cy="62" r="2.5" fill="#38bdf8"/>
+    <circle cx="98" cy="70" r="2" fill="#38bdf8"/>
+    <circle cx="68" cy="68" r="2" fill="#38bdf8"/>
+  </g>
+
+  <!-- Friendly Climate Forecaster Character (BMKG Forecaster Mascot) -->
+  <g id="forecaster-character" transform="translate(45, 45)">
+    <!-- Shadow -->
+    <ellipse cx="85" cy="188" rx="45" ry="8" fill="#0f172a" opacity="0.12"/>
+
+    <!-- Body / Torso (BMKG Official Uniform) -->
+    <path d="M52,125 L118,125 L125,185 L45,185 Z" fill="url(#uniformGrad)"/>
+    <!-- Vest / Tie Accent -->
+    <path d="M72,125 L98,125 L94,185 L76,185 Z" fill="url(#vestGrad)"/>
+    <!-- ID Card / BMKG Badge on chest -->
+    <rect x="58" y="142" width="12" height="16" rx="2" fill="#ffffff" stroke="#cbd5e1" stroke-width="0.8"/>
+    <line x1="60" y1="147" x2="68" y2="147" stroke="#0284c7" stroke-width="1"/>
+    <line x1="60" y1="151" x2="66" y2="151" stroke="#64748b" stroke-width="0.8"/>
+    <circle cx="64" cy="138" r="1.5" fill="#f59e0b"/>
+
+    <!-- Left Arm holding Digital Tablet/Radar Tool -->
+    <path d="M52,126 L30,150 L42,165 L58,140 Z" fill="url(#uniformGrad)"/>
+    <!-- Tablet -->
+    <rect x="18" y="145" width="26" height="34" rx="4" fill="#0f172a" stroke="#38bdf8" stroke-width="1.2" transform="rotate(-12 31 162)"/>
+    <!-- Tablet screen graph -->
+    <path d="M22,158 L27,153 L33,162 L39,150" fill="none" stroke="#22c55e" stroke-width="1.5" transform="rotate(-12 31 162)"/>
+
+    <!-- Right Arm in friendly welcoming wave / thumbs-up gesture -->
+    <path d="M118,126 L138,138 L142,120 L126,112 Z" fill="url(#uniformGrad)"/>
+    <!-- Hand -->
+    <circle cx="144" cy="115" r="7" fill="url(#skinGrad)"/>
+    <!-- Friendly thumb -->
+    <path d="M145,110 Q148,106 150,111 Q148,115 145,114 Z" fill="url(#skinGrad)"/>
+
+    <!-- Neck -->
+    <rect x="79" y="112" width="12" height="15" rx="3" fill="url(#skinGrad)"/>
+    <polygon points="73,124 85,134 85,124" fill="#ffffff"/>
+    <polygon points="97,124 85,134 85,124" fill="#f1f5f9"/>
+
+    <!-- Head -->
+    <ellipse cx="85" cy="85" rx="28" ry="30" fill="url(#skinGrad)"/>
+
+    <!-- Ears -->
+    <ellipse cx="57" cy="86" rx="4" ry="7" fill="url(#skinGrad)"/>
+    <ellipse cx="113" cy="86" rx="4" ry="7" fill="url(#skinGrad)"/>
+
+    <!-- Professional Cap / Hair -->
+    <!-- Neat hair base -->
+    <path d="M57,80 C57,60 70,52 85,52 C100,52 113,60 113,80 C108,74 98,72 85,73 C72,72 62,74 57,80 Z" fill="url(#hairGrad)"/>
+
+    <!-- Cheerful Big Eyes (Anime/Chibi Friendly Mascot Style) -->
+    <!-- Left Eye -->
+    <ellipse cx="74" cy="85" rx="4" ry="5.5" fill="#0f172a"/>
+    <circle cx="75.5" cy="83" r="1.8" fill="#ffffff"/>
+    <!-- Right Eye -->
+    <ellipse cx="96" cy="85" rx="4" ry="5.5" fill="#0f172a"/>
+    <circle cx="97.5" cy="83" r="1.8" fill="#ffffff"/>
+
+    <!-- Eyebrows (Smart & Energetic) -->
+    <path d="M69,76 Q74,74 79,76" fill="none" stroke="#1e293b" stroke-width="1.8" stroke-linecap="round"/>
+    <path d="M91,76 Q96,74 101,76" fill="none" stroke="#1e293b" stroke-width="1.8" stroke-linecap="round"/>
+
+    <!-- Cheerful Smile -->
+    <path d="M78,96 Q85,103 92,96" fill="none" stroke="#9a3412" stroke-width="1.8" stroke-linecap="round"/>
+    <!-- Blush -->
+    <circle cx="68" cy="93" r="4.5" fill="#fb7185" opacity="0.35"/>
+    <circle cx="102" cy="93" r="4.5" fill="#fb7185" opacity="0.35"/>
+  </g>
+
+  <!-- Mini Info Badge Beside Forecaster -->
+  <g transform="translate(165, 140)">
+    <rect width="135" height="58" rx="10" fill="#ffffff" filter="drop-shadow(0 4px 10px rgba(15,23,42,0.08))" stroke="#e0f2fe" stroke-width="1"/>
+    <!-- Mini indicator bar -->
+    <rect x="10" y="10" width="4" height="38" rx="2" fill="#0284c7"/>
+    <text x="20" y="24" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="700" fill="#0369a1" letter-spacing="0.5">METEOROLOGI KEPRI</text>
+    <text x="20" y="38" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="500" fill="#334155">Stasiun RHF TPI</text>
+    <text x="20" y="49" font-family="system-ui, -apple-system, sans-serif" font-size="8" font-weight="600" fill="#0d9488">57 Titik Monitoring</text>
+  </g>
+</svg>
+

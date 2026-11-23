@@ -1,0 +1,75 @@
+# ==============================================================================
+# Climate Early Warning System (CEWS) BMKG - Git Ignore Configuration
+# ==============================================================================
+
+# Bytecode, compilation artifacts & test caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Environment configs with secrets (keep .env.example tracked)
+.env
+.env.docker
+.venv/
+env/
+venv/
+ENV/
+
+# Microsoft Office transient lock files
+~$*.xlsx
+~$*.docx
+~$*.pptx
+
+# Frontend dependencies & build artifacts
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
+
+# Logs and runtime dumps
+logs/*.log
+*.log
+
+# Operating System files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# Temporary outputs & scratch files
+outputs/temp/
+outputs/tmp/
+scratch/*
+!scratch/.gitkeep
+.vite/
+frontend/.vite/
+logs/runtime/*.log
+logs/runtime/*.lock
+logs/runtime/dss_pik_state.json
+*.bak_*
+releases/
+
+
+# Phase 8.4 — GitHub Security Exclusions (never commit dumps, operational data, or image archives)
+.env.production
+*.sql
+*.sql.gz
+*.tar.gz
+*.zip
+backups/
+data/
+!.env.example
+!.env.docker.example
+!.env.production.example
+
+# Active local LAN policy (keep .example template tracked) & runtime/non-source folders
+config/lan_access_policy.json
+frontend/.env
+frontend/vite.config.js.timestamp-*
+logs/
+outputs/
+reports/
+tambahan/
+vendor/
+*.parquet

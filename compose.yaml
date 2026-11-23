@@ -1,0 +1,100 @@
+# ==============================================================================
+# DSS-PIK BMKG Kepulauan Riau — Multi-Container Architecture (Phase 8.4)
+# Architecture: Frontend (Nginx) -> Backend (FastAPI) -> MariaDB 11.4
+#
+# SAFETY & SECURITY:
+# - MariaDB (3306) and Backend (8000) are internal-only (never published publicly)
+# - Frontend (Nginx) is the sole HTTP entry point (default: 127.0.0.1:${DSS_PIK_HTTP_PORT:-8080}:80)
+# - Previous single-container compose preserved as `compose.single-container.yaml`
+# - NEVER run `docker compose down -v` during routine maintenance or upgrades!
+# ==============================================================================
+
+services:
+  mariadb:
+    image: mariadb:11.4
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${CEWS_DB_NAME:-cews_db}
+      MARIADB_USER: ${CEWS_DB_USER:-dsspik_app}
+      MARIADB_PASSWORD: ${CEWS_DB_PASSWORD:?Set CEWS_DB_PASSWORD in env file}
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:?Set MARIADB_ROOT_PASSWORD in env file}
+      TZ: Asia/Jakarta
+    volumes:
+      - dss_pik_mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - dss_pik_internal
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: dss-pik-backend:${DSS_PIK_VERSION:-1.1.0}
+    restart: unless-stopped
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    environment:
+      CEWS_DB_HOST: mariadb
+      CEWS_DB_PORT: 3306
+      CEWS_DB_NAME: ${CEWS_DB_NAME:-cews_db}
+      CEWS_DB_USER: ${CEWS_DB_USER:-dsspik_app}
+      CEWS_DB_PASSWORD: ${CEWS_DB_PASSWORD:?Set CEWS_DB_PASSWORD in env file}
+      CEWS_SERVE_FRONTEND: "false"
+      CEWS_PORT: 8000
+      CEWS_DOCKER_LOCAL_ONLY: "${CEWS_DOCKER_LOCAL_ONLY:-false}"
+      CEWS_TRUSTED_PROXY_CIDRS: "${CEWS_TRUSTED_PROXY_CIDRS:-172.16.0.0/12}"
+      DSS_PIK_USERNAME: ${DSS_PIK_USERNAME:-klimatkepri}
+      DSS_PIK_PASSWORD_HASH: ${DSS_PIK_PASSWORD_HASH:?Set DSS_PIK_PASSWORD_HASH in env file}
+      DSS_PIK_SESSION_SECRET: ${DSS_PIK_SESSION_SECRET:?Set DSS_PIK_SESSION_SECRET in env file}
+      TZ: Asia/Jakarta
+    volumes:
+      - ${DSS_PIK_DATA_DIR:-./data}:/app/data:ro
+      - dss_pik_maps_output:/app/data/operational/maps
+      - dss_pik_sih3_output:/app/data/output
+      - dss_pik_runtime_logs:/app/logs/runtime
+      - dss_pik_outputs:/app/outputs
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
+    networks:
+      - dss_pik_internal
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: dss-pik-frontend:${DSS_PIK_VERSION:-1.1.0}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${DSS_PIK_BIND_IP:-127.0.0.1}:${DSS_PIK_HTTP_PORT:-8080}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:80/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - dss_pik_internal
+
+volumes:
+  dss_pik_mariadb_data:
+  dss_pik_maps_output:
+  dss_pik_sih3_output:
+  dss_pik_runtime_logs:
+  dss_pik_outputs:
+
+networks:
+  dss_pik_internal:
+    driver: bridge

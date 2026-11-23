@@ -1,0 +1,92 @@
+# ==============================================================================
+# DSS-PIK BMKG Kepulauan Riau — GitHub Actions CI/CD & Manual Server Deployment
+# Trigger: Manual (`workflow_dispatch`) until Ubuntu Server secrets are provisioned
+# ==============================================================================
+
+name: DSS-PIK Build, Test & Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: "Semantic version tag (e.g. 1.1.0)"
+        required: true
+        default: "1.1.0"
+      deploy_to_server:
+        description: "Deploy built images to BMKG Ubuntu Server via SSH"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository }}
+
+jobs:
+  test:
+    name: Automated Regression & Security Suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install locked dependencies
+        run: pip install -r requirements-lock.txt
+      - name: Run unit & security tests
+        run: pytest test_phase4_decision_engine.py test_phase42_consistency.py test_phase822_docker_local_security.py test_phase84_split_proxy_security.py -v
+
+  build-and-push:
+    name: Build & Publish Frontend + Backend Images (GHCR)
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build & Push Backend Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/Dockerfile
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-backend:${{ inputs.release_version }}
+      - name: Build & Push Frontend Image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: frontend/Dockerfile
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend:${{ inputs.release_version }}
+
+  deploy:
+    name: Deploy to BMKG Ubuntu Server (SSH)
+    needs: build-and-push
+    if: ${{ inputs.deploy_to_server == true }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy versioned images over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          script: |
+            set -e
+            cd "${{ secrets.DEPLOY_PATH }}"
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USER }}" --password-stdin
+            sed -i "s/^DSS_PIK_VERSION=.*/DSS_PIK_VERSION=${{ inputs.release_version }}/" .env.production
+            docker compose --env-file .env.production pull frontend backend
+            docker compose --env-file .env.production up -d --no-deps backend frontend
+            sleep 5
+            curl -fsS http://127.0.0.1:8080/health

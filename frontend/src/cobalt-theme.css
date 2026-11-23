@@ -1,0 +1,1037 @@
+/* ==============================================================================
+   HALLMARK COBALT DESIGN SYSTEM TOKENS & OPERATIONAL METEOROLOGICAL STYLES
+   Phase 5.2 — BMKG Atmospheric Gradient Refinement
+   Theme: Cobalt + BMKG Marine & Atmospheric Sky Gradient Accents
+   Palette: Cool engineered near-white paper, blue-grey ink, hairline rules, electric cobalt & soft seafoam/teal atmospheric wash
+   Typography: Space Grotesk (Headings/Display), Inter (Body/UI), JetBrains Mono (Data)
+   ============================================================================== */
+
+:root {
+  /* Cobalt Paper & Surfaces */
+  --color-paper: oklch(98.5% 0.005 250);        /* #f8fafc - Cool engineered near-white canvas */
+  --color-paper-2: oklch(96.5% 0.008 252);      /* #f1f5f9 - Secondary surface / toolbar / well */
+  --color-paper-3: oklch(100% 0 0);             /* #ffffff - Card surface */
+  --color-paper-4: oklch(94% 0.012 252);        /* #e2e8f0 - Row hover & elevated borders */
+
+  /* BMKG Atmospheric Gradients & Tints (Airy, Marine-to-Sky, Subtle & Controlled) */
+  --bmkg-sky-wash: linear-gradient(135deg, rgba(238, 246, 255, 0.85) 0%, rgba(240, 253, 250, 0.75) 50%, rgba(248, 250, 252, 0.95) 100%);
+  --bmkg-header-grad: linear-gradient(135deg, #0f2744 0%, #173860 35%, #1e4b82 70%, #165b7e 100%);
+  --bmkg-header-border: linear-gradient(90deg, #38bdf8 0%, #2dd4bf 50%, #3b82f6 100%);
+  --bmkg-hero-accent-strip: linear-gradient(90deg, #0284c7 0%, #0d9488 50%, #3b82f6 100%);
+  --bmkg-accent-glow: 0 2px 10px rgba(14, 165, 233, 0.12);
+
+  /* Inks & Text (High Contrast, Calm Technical Tone) */
+  --color-ink: oklch(22% 0.028 260);            /* #0f172a - Main charcoal ink */
+  --color-ink-2: oklch(36% 0.024 258);          /* #334155 - Body & technical labels */
+  --color-muted: oklch(52% 0.02 256);           /* #64748b - Subtitle, captions, table headers */
+
+  /* Hairlines & Dividers */
+  --color-rule: oklch(90% 0.01 252);            /* #e2e8f0 - Subtle cool-gray hairline */
+  --color-rule-2: oklch(84% 0.014 252);         /* #cbd5e1 - Distinct hairline divider */
+
+  /* Primary Accent: Electric Cobalt Blue (<5% Visual Weight) */
+  --color-accent: oklch(56% 0.20 256);          /* #2563eb / #1d4ed8 - Electric Cobalt */
+  --color-accent-2: oklch(48% 0.22 256);        /* Cobalt Hover / Deep Active */
+  --color-accent-wash: oklch(96% 0.025 256);    /* Soft cobalt wash for active rows/tags */
+  --color-accent-ink: #ffffff;                  /* White text on cobalt button/pill */
+  --color-focus: oklch(56% 0.20 256);           /* Crisp high-visibility focus */
+
+  /* Graphite (Engineered Technical Accent) */
+  --color-graphite: oklch(21% 0.024 262);       /* #0f172a - Dark graphite */
+  --color-graphite-ink: #f8fafc;
+
+  /* Typography Stack */
+  --font-display: "Space Grotesk", system-ui, -apple-system, sans-serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", Consolas, "Courier New", monospace;
+  --font-sans: var(--font-body);
+
+  /* Geometry & Restraint */
+  --radius-card: 4px;
+  --radius-input: 4px;
+  --radius-pill: 999px;
+  --rule-hair: 1px;
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.03);
+  --shadow-md: 0 2px 4px rgba(15, 23, 42, 0.05);
+
+  /* Semantic Meteorological Warning Invariants (Restrained Badges & Borders) */
+  --color-normal: #16a34a;
+  --color-normal-bg: #f0fdf4;
+  --color-normal-border: #bbf7d0;
+  --color-normal-text: #15803d;
+
+  --color-waspada: #d97706;
+  --color-waspada-bg: #fffbeb;
+  --color-waspada-border: #fde68a;
+  --color-waspada-text: #b45309;
+
+  --color-siaga: #ea580c;
+  --color-siaga-bg: #fff7ed;
+  --color-siaga-border: #fed7aa;
+  --color-siaga-text: #c2410c;
+
+  --color-awas: #dc2626;
+  --color-awas-bg: #fef2f2;
+  --color-awas-border: #fecaca;
+  --color-awas-text: #b91c1c;
+
+  --color-incomplete: #64748b;
+  --color-incomplete-bg: #f8fafc;
+  --color-incomplete-border: #cbd5e1;
+  --color-incomplete-text: #475569;
+
+  /* Backward Compatibility Mappings */
+  --bg-app: var(--color-paper);
+  --bg-card: var(--color-paper-3);
+  --text-primary: var(--color-ink);
+  --text-secondary: var(--color-ink-2);
+  --text-muted: var(--color-muted);
+  --border-light: var(--color-rule);
+  --border-subtle: var(--color-rule-2);
+  --border-sage: var(--color-rule);
+  --green-forest: var(--color-accent);
+  --green-deep: var(--color-ink);
+  --green-sage: var(--color-muted);
+  --green-light: var(--color-accent-wash);
+  --green-subtle: var(--color-paper-2);
+}
+
+/* ==============================================================================
+   GLOBAL RESET & ATMOSPHERIC CANVAS
+   ============================================================================== */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-body);
+  background-color: var(--color-paper);
+  background-image: 
+    radial-gradient(at 15% 15%, rgba(14, 165, 233, 0.035) 0px, transparent 55%),
+    radial-gradient(at 85% 85%, rgba(20, 184, 166, 0.035) 0px, transparent 55%),
+    linear-gradient(180deg, rgba(241, 245, 249, 0.6) 0%, rgba(248, 250, 252, 1) 320px);
+  background-attachment: fixed;
+  color: var(--color-ink);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, .heading-display, .header-brand-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.font-mono, code, pre, .font-tabular {
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1, "cv01" 1;
+}
+
+/* ==============================================================================
+   1. INSTITUTIONAL HEADER (BMKG ATMOSPHERIC DEEP BLUE & TEAL WASH)
+   ============================================================================== */
+.header-container {
+  background: var(--bmkg-header-grad) !important;
+  color: #ffffff !important;
+  padding: 11px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid transparent !important;
+  border-image: var(--bmkg-header-border) 1 !important;
+  box-shadow: 0 3px 12px rgba(15, 39, 68, 0.22);
+  z-index: 1000;
+  position: relative;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.bmkg-header-logo {
+  height: 50px;
+  width: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.35));
+}
+
+.header-brand-title {
+  font-size: 1.05rem !important;
+  font-family: var(--font-display) !important;
+  font-weight: 700 !important;
+  color: #ffffff !important;
+  letter-spacing: 0.01em !important;
+  line-height: 1.25 !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+.badge-dss {
+  background: rgba(56, 189, 248, 0.18) !important;
+  color: #7dd3fc !important;
+  border: 1px solid rgba(125, 211, 252, 0.35) !important;
+  font-family: var(--font-body) !important;
+  font-size: 0.65rem !important;
+  font-weight: 600 !important;
+  padding: 2px 8px !important;
+  border-radius: var(--radius-pill) !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase !important;
+}
+
+.header-subtitle {
+  font-size: 0.75rem !important;
+  color: #bae6fd !important;
+  margin-top: 1px !important;
+  opacity: 0.95 !important;
+}
+
+/* Nav Tabs: Atmospheric Capsule Controls */
+.header-nav-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(10, 25, 45, 0.45) !important;
+  padding: 3px !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: var(--radius-pill) !important;
+}
+
+.header-nav-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: var(--radius-pill);
+  border: none;
+  background: transparent !important;
+  color: #e0f2fe !important;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.header-nav-tab:hover {
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+
+.header-nav-tab.active {
+  background: #ffffff !important;
+  color: #0369a1 !important;
+  font-weight: 700 !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.header-meta-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.meta-label {
+  font-size: 0.65rem !important;
+  color: #7dd3fc !important;
+  text-transform: uppercase !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.05em !important;
+}
+
+.meta-value {
+  font-size: 0.8rem !important;
+  font-weight: 500 !important;
+  color: #ffffff !important;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.meta-icon {
+  color: #38bdf8 !important;
+}
+
+.operator-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(10, 25, 45, 0.45) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 0.75rem;
+  color: #f0f9ff !important;
+}
+
+.btn-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 6px rgba(2, 132, 199, 0.35);
+}
+
+.btn-refresh:hover:not(:disabled) {
+  background: linear-gradient(135deg, #0369a1 0%, #075985 100%) !important;
+  border-color: #7dd3fc !important;
+}
+
+.btn-logout {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #e0f2fe !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.btn-logout:hover {
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.16) !important;
+}
+
+/* ==============================================================================
+   2. PERIOD & SYSTEM INFORMATION BANNER (SOFT SKY-TO-TEAL WASH)
+   ============================================================================== */
+.institutional-banner {
+  background: linear-gradient(90deg, #f0f9ff 0%, #f0fdfa 40%, #ffffff 80%) !important;
+  border-bottom: 1px solid #e0f2fe !important;
+  padding: 10px 24px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  box-shadow: 0 1px 3px rgba(2, 132, 199, 0.04);
+}
+
+.banner-tag {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: linear-gradient(135deg, #e0f2fe 0%, #ccfbf1 100%) !important;
+  color: #0369a1 !important;
+  border: 1px solid #bae6fd !important;
+  padding: 3px 9px;
+  border-radius: var(--radius-input);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.banner-desc {
+  font-size: 0.8rem;
+  color: #1e293b;
+}
+
+.period-selector-container {
+  background: #ffffff !important;
+  border: 1px solid #bae6fd !important;
+  border-left: 3px solid #0284c7 !important;
+  border-radius: var(--radius-input);
+  padding: 6px 12px;
+  box-shadow: 0 1px 2px rgba(2, 132, 199, 0.05);
+}
+
+.period-selector-label {
+  color: #0369a1 !important;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.period-dropdown-select {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: var(--radius-input);
+  padding: 5px 28px 5px 8px;
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.82rem;
+}
+
+.period-dropdown-select:hover {
+  border-color: #0284c7 !important;
+}
+
+.period-meta-card {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: var(--radius-input);
+  padding: 5px 10px;
+}
+
+.period-meta-card.highlight-target {
+  border-color: #7dd3fc !important;
+  background: linear-gradient(135deg, #f0f9ff 0%, #f0fdfa 100%) !important;
+}
+
+.period-meta-card.highlight-target .period-meta-label {
+  color: #0284c7 !important;
+}
+
+/* ==============================================================================
+   3. KPI SUMMARY CARDS (SOLID CRISP CARDS WITH ATMOSPHERIC ACCENT STRIPS)
+   ============================================================================== */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+  background: linear-gradient(180deg, rgba(240, 249, 255, 0.3) 0%, transparent 100%);
+  padding: 4px;
+  border-radius: var(--radius-card);
+}
+
+.kpi-card {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: var(--radius-card);
+  padding: 12px 14px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  transition: all 0.15s ease;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  overflow: hidden;
+}
+
+.kpi-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2.5px;
+  background: #cbd5e1;
+}
+
+.kpi-total::before { background: linear-gradient(90deg, #0284c7 0%, #0d9488 100%); }
+.kpi-normal::before { background: #16a34a; }
+.kpi-waspada::before { background: #eab308; }
+.kpi-siaga::before { background: #f97316; }
+.kpi-awas::before { background: #dc2626; }
+.kpi-incomplete::before { background: #64748b; }
+
+.kpi-card:hover {
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 4px 8px rgba(15, 23, 42, 0.06);
+  transform: translateY(-1px);
+}
+
+.kpi-card.active {
+  border-color: #0284c7 !important;
+  outline: 2px solid rgba(2, 132, 199, 0.25);
+  background: #ffffff !important;
+}
+
+.kpi-card-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #475569 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.kpi-count {
+  font-family: var(--font-mono);
+  font-size: 1.85rem;
+  font-weight: 700;
+  line-height: 1;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+
+.kpi-total .kpi-count { color: #0369a1 !important; }
+.kpi-normal .kpi-count { color: var(--color-normal-text); }
+.kpi-waspada .kpi-count { color: var(--color-waspada-text); }
+.kpi-siaga .kpi-count { color: var(--color-siaga-text); }
+.kpi-awas .kpi-count { color: var(--color-awas-text); }
+.kpi-incomplete .kpi-count { color: var(--color-incomplete-text); }
+
+.kpi-status-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+}
+
+.kpi-card-footer {
+  border-top: 1px solid #f1f5f9 !important;
+  padding-top: 5px;
+  margin-top: 4px;
+}
+
+.kpi-desc {
+  font-size: 0.68rem;
+  color: #64748b;
+}
+
+/* ==============================================================================
+   4. DUAL HAZARD BAR & FILTER TOOLBAR (TEAL/BLUE ATMOSPHERIC ACCENTS)
+   ============================================================================== */
+.filter-bar {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-top: 2px solid #0284c7 !important;
+  border-radius: var(--radius-card);
+  padding: 8px 16px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.btn-view-pill {
+  border-radius: var(--radius-pill);
+  color: #64748b;
+  font-size: 0.78rem;
+}
+
+.btn-view-pill.active {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
+  color: #ffffff !important;
+  font-weight: 600;
+  box-shadow: 0 2px 4px rgba(2, 132, 199, 0.25);
+}
+
+.filter-select, .search-input {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: var(--radius-input);
+  font-size: 0.8rem;
+  padding: 5px 8px;
+}
+
+.filter-select:focus, .search-input:focus {
+  border-color: #0284c7 !important;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2);
+}
+
+/* ==============================================================================
+   5. PRIORITY LIST & CARDS (DAFTAR TITIK PERHATIAN KHUSUS)
+   ============================================================================== */
+.priority-overview-panel {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: var(--radius-card);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  height: 100%;
+}
+
+.priority-header {
+  border-bottom: 1px solid #e2e8f0 !important;
+  border-top: 2px solid #0d9488 !important;
+  padding: 10px 16px;
+  background: linear-gradient(90deg, #f0fdfa 0%, #f0f9ff 100%) !important;
+}
+
+.priority-title {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.priority-count-badge {
+  background: linear-gradient(135deg, #e0f2fe 0%, #ccfbf1 100%) !important;
+  color: #0369a1 !important;
+  border: 1px solid #bae6fd !important;
+  border-radius: var(--radius-pill);
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+}
+
+.priority-card {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: var(--radius-card);
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  transition: all 0.15s ease;
+}
+
+.priority-card:hover {
+  background: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
+}
+
+.priority-card-name {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 4px 0 2px 0;
+}
+
+.badge-pill {
+  font-size: 0.65rem;
+  font-weight: 700;
+  border-radius: var(--radius-pill);
+  padding: 2px 7px;
+}
+
+.badge-pill.lvl-awas {
+  background: var(--color-awas-bg);
+  color: var(--color-awas-text);
+  border: 1px solid var(--color-awas-border);
+}
+
+.badge-pill.lvl-siaga {
+  background: var(--color-siaga-bg);
+  color: var(--color-siaga-text);
+  border: 1px solid var(--color-siaga-border);
+}
+
+.badge-pill.lvl-waspada {
+  background: var(--color-waspada-bg);
+  color: var(--color-waspada-text);
+  border: 1px solid var(--color-waspada-border);
+}
+
+.badge-pill.lvl-normal {
+  background: var(--color-normal-bg);
+  color: var(--color-normal-text);
+  border: 1px solid var(--color-normal-border);
+}
+
+/* ==============================================================================
+   6. TABLES & DATA CENTER (ENGINEERED CLEAN ROWS WITH SKY/TEAL BORDERS)
+   ============================================================================== */
+.early-warning-table-wrapper, .data-center-table-wrapper, .rainfall-table-wrapper {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-top: 2px solid #0284c7 !important;
+  border-radius: var(--radius-card);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+thead th {
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%) !important;
+  color: #475569 !important;
+  font-family: var(--font-body);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+  border-bottom: 1.5px solid #cbd5e1 !important;
+  padding: 7px 10px;
+}
+
+tbody tr {
+  border-bottom: 1px solid #e2e8f0 !important;
+  transition: background-color 0.12s ease;
+}
+
+tbody tr:hover {
+  background-color: #f0f9ff !important;
+}
+
+tbody tr.selected-row {
+  background-color: #e0f2fe !important;
+  border-left: 3px solid #0284c7 !important;
+}
+
+tbody td {
+  padding: 7px 10px;
+  color: #0f172a !important;
+}
+
+.td-sticky-col {
+  background: #ffffff !important;
+}
+
+tbody tr:hover .td-sticky-col {
+  background: #f0f9ff !important;
+}
+
+/* ==============================================================================
+   7. STATION DETAIL DRAWER (CRISP LIGHT DOSSIER WITH ATMOSPHERIC HEADER)
+   ============================================================================== */
+.detail-drawer {
+  background: #ffffff !important;
+  border-left: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+  box-shadow: -4px 0 15px rgba(15, 23, 42, 0.06);
+}
+
+.drawer-header {
+  border-bottom: 1px solid #bae6fd !important;
+  background: linear-gradient(135deg, #f0f9ff 0%, #f0fdfa 100%) !important;
+  padding: 14px 18px;
+  position: relative;
+}
+
+.drawer-header::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #0284c7 0%, #0d9488 100%);
+}
+
+.drawer-title {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #0f172a !important;
+}
+
+.drawer-card {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: var(--radius-card);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+
+.section-heading {
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: #0369a1 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+
+.status-hero-card {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: var(--radius-card);
+  padding: 12px 14px;
+}
+
+/* ==============================================================================
+   8. MODALS & FORMS
+   ============================================================================== */
+.modal-overlay, .modal-backdrop {
+  background: rgba(15, 39, 68, 0.45);
+  backdrop-filter: blur(2px);
+}
+
+.modal-content, .modal-dialog-content {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  border-top: 3px solid #0284c7 !important;
+  border-radius: var(--radius-card);
+  color: #0f172a !important;
+  box-shadow: 0 12px 28px -5px rgba(15, 39, 68, 0.18);
+}
+
+.modal-header {
+  border-bottom: 1px solid #e2e8f0 !important;
+  background: linear-gradient(90deg, #f0f9ff 0%, #ffffff 100%) !important;
+  padding: 12px 18px;
+}
+
+.modal-title {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #0f172a !important;
+}
+
+.modal-footer {
+  border-top: 1px solid #e2e8f0 !important;
+  padding: 10px 18px;
+  background: #f8fafc !important;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid #0284c7 !important;
+  border-radius: var(--radius-pill);
+  font-weight: 600;
+  padding: 6px 16px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 4px rgba(2, 132, 199, 0.25);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #0369a1 0%, #075985 100%) !important;
+  border-color: #075985 !important;
+}
+
+.btn-secondary {
+  background: #ffffff !important;
+  color: #334155 !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: var(--radius-pill);
+  padding: 6px 16px;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  background: #f1f5f9 !important;
+}
+/* ==============================================================================
+   LOGIN PAGE — BMKG ATMOSPHERIC GRADIENT & COBALT THEME INTEGRATION
+   ============================================================================== */
+.login-page-container {
+  min-height: 100vh !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: radial-gradient(at 10% 20%, #1e4b82 0%, #0f2744 40%, #071526 100%) !important;
+  padding: 24px 16px !important;
+  position: relative !important;
+  overflow: hidden !important;
+  font-family: var(--font-body) !important;
+}
+
+.login-page-container::before {
+  content: '';
+  position: absolute;
+  top: -15%;
+  right: -10%;
+  width: 550px;
+  height: 550px;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.18) 0%, rgba(45, 212, 191, 0.08) 45%, transparent 70%);
+  pointer-events: none;
+}
+
+.login-page-container::after {
+  content: '';
+  position: absolute;
+  bottom: -20%;
+  left: -10%;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(14, 165, 233, 0.15) 0%, rgba(20, 184, 166, 0.06) 50%, transparent 70%);
+  pointer-events: none;
+}
+
+.login-card-surface {
+  position: relative !important;
+  z-index: 10 !important;
+  width: 100% !important;
+  max-width: 440px !important;
+  background: #ffffff !important;
+  border-radius: 16px !important;
+  padding: 34px 32px 30px !important;
+  box-shadow: 0 20px 45px -10px rgba(10, 25, 45, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.15) !important;
+  border-top: 3px solid transparent !important;
+  border-image: linear-gradient(90deg, #38bdf8 0%, #2dd4bf 50%, #3b82f6 100%) 1 !important;
+}
+
+.login-header-block {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  text-align: center !important;
+  margin-bottom: 24px !important;
+}
+
+.login-logo-wrapper {
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-bmkg-logo {
+  height: 108px;
+  width: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 3px 8px rgba(15, 39, 68, 0.2));
+}
+
+.login-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.login-brand-title {
+  font-size: 1.65rem !important;
+  font-family: var(--font-display) !important;
+  font-weight: 700 !important;
+  color: #0f2744 !important;
+  letter-spacing: -0.01em !important;
+  line-height: 1.1 !important;
+  margin: 0 !important;
+  text-align: center !important;
+}
+
+.login-app-title {
+  font-size: 0.9rem !important;
+  font-weight: 600 !important;
+  color: #1e3a8a !important;
+  line-height: 1.35 !important;
+  margin: 0 0 6px 0 !important;
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .login-app-title {
+    white-space: normal;
+  }
+}
+
+.login-institution-subtitle {
+  font-size: 0.8rem !important;
+  color: #64748b !important;
+  margin: 0 !important;
+  font-weight: 500 !important;
+}
+
+.login-error-banner {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 10px !important;
+  background: #fef2f2 !important;
+  border: 1px solid #fecaca !important;
+  color: #b91c1c !important;
+  padding: 10px 14px !important;
+  border-radius: 8px !important;
+  font-size: 0.8rem !important;
+  line-height: 1.4 !important;
+  margin-bottom: 18px !important;
+}
+
+.login-error-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.login-form {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 16px !important;
+}
+
+.login-field-group {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+}
+
+.login-label {
+  font-size: 0.72rem !important;
+  font-weight: 700 !important;
+  color: #334155 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+}
+
+.login-input-wrapper {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.login-input-icon {
+  position: absolute !important;
+  left: 12px !important;
+  color: #64748b !important;
+  pointer-events: none !important;
+}
+
+.login-input {
+  width: 100% !important;
+  height: 42px !important;
+  padding: 0 38px 0 38px !important;
+  border: 1.5px solid #cbd5e1 !important;
+  border-radius: 8px !important;
+  font-size: 0.88rem !important;
+  background: #ffffff !important;
+  color: #0f172a !important;
+  outline: none !important;
+  transition: all 0.15s ease !important;
+}
+
+.login-input:focus {
+  border-color: #0284c7 !important;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15) !important;
+}
+
+.btn-toggle-password {
+  position: absolute !important;
+  right: 10px !important;
+  background: none !important;
+  border: none !important;
+  color: #64748b !important;
+  cursor: pointer !important;
+  padding: 4px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: color 0.15s !important;
+}
+
+.btn-toggle-password:hover {
+  color: #0284c7 !important;
+}
+
+.btn-login-submit {
+  height: 44px !important;
+  margin-top: 6px !important;
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 8px !important;
+  font-size: 0.88rem !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35) !important;
+  transition: all 0.15s ease !important;
+}
+
+.btn-login-submit:hover:not(:disabled) {
+  background: linear-gradient(135deg, #0369a1 0%, #075985 100%) !important;
+  box-shadow: 0 6px 16px rgba(2, 132, 199, 0.45) !important;
+  transform: translateY(-1px) !important;
+}
+
+.btn-login-submit:active:not(:disabled) {
+  transform: translateY(0) !important;
+}
+
+.btn-login-submit:disabled {
+  opacity: 0.7 !important;
+  cursor: not-allowed !important;
+}

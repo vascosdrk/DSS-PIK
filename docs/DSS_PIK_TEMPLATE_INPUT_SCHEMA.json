@@ -1,0 +1,1072 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "version": "1.0.0",
+  "generated_at": "2026-10-30T20:10:00+07:00",
+  "title": "DSS-PIK Input Data File Template Schema Specification",
+  "description": "Formal machine-readable schema and mapping specifications for DSS-PIK (BMKG Tanjungpinang) file upload and data ingestion engine.",
+  "institution": {
+    "name": "Stasiun Meteorologi Kelas II Raja Haji Fisabilillah Tanjungpinang",
+    "agency": "BMKG (Badan Meteorologi, Klimatologi, dan Geofisika)",
+    "system": "DSS-PIK (Decision Support System Peringatan Iklim Kepulauan Riau)"
+  },
+  "categories": {
+    "curah_hujan": {
+      "category_name": "Data Curah Hujan Harian (Daily Rainfall)",
+      "file_patterns": [
+        "ch/*.xlsx",
+        "ch/*.xls"
+      ],
+      "ignore_patterns": [
+        "*~$*",
+        "*.tmp"
+      ],
+      "total_files": 6,
+      "total_sheets": 53,
+      "structure": {
+        "header_row_index_1_based": 1,
+        "data_start_row_index_1_based": 2,
+        "columns": [
+          {
+            "column_index_1_based": 1,
+            "header_name": "tanggal",
+            "data_type": "date",
+            "source_format": "excel_serial_datetime",
+            "target_field": "date",
+            "target_format": "YYYY-MM-DD",
+            "validation": {
+              "min_date": "1970-01-01",
+              "max_date": "2035-12-31"
+            }
+          },
+          {
+            "column_index_1_based": 2,
+            "header_name": "CH",
+            "data_type": "float_or_symbol",
+            "target_field": "rainfall_mm",
+            "unit": "mm",
+            "validation": {
+              "min_value": 0.0,
+              "warning_threshold": 500.0
+            }
+          }
+        ],
+        "merged_cells_allowed": false,
+        "allowed_formulas": false,
+        "dual_region_workbooks": {
+          "Kota Tanjungpinang.xlsx": {
+            "rule": "SPLIT_BY_STATION_METADATA",
+            "tanjungpinang_sheet_count": 4,
+            "bintan_sheet_count": 14,
+            "explanation": "Do not assign regency from workbook name. Use station_id to resolve administrative region."
+          }
+        },
+        "symbol_normalization": {
+          "-": {
+            "rainfall_mm": 0.0,
+            "obs_status": "OBSERVED",
+            "description": "Dry day / no precipitation"
+          },
+          "TTU": {
+            "rainfall_mm": 0.0,
+            "obs_status": "TTU",
+            "description": "Trace precipitation (<0.5mm)"
+          },
+          "ttu": {
+            "rainfall_mm": 0.0,
+            "obs_status": "TTU",
+            "description": "Trace precipitation (<0.5mm)"
+          },
+          "T.T.U": {
+            "rainfall_mm": 0.0,
+            "obs_status": "TTU",
+            "description": "Trace precipitation (<0.5mm)"
+          },
+          "X": {
+            "rainfall_mm": null,
+            "obs_status": "MISSING",
+            "description": "Missing observation / no record"
+          },
+          "NO DATA": {
+            "rainfall_mm": null,
+            "obs_status": "MISSING",
+            "description": "Missing observation"
+          },
+          "": {
+            "rainfall_mm": null,
+            "obs_status": "MISSING",
+            "description": "Blank cell"
+          },
+          "R": {
+            "rainfall_mm": null,
+            "obs_status": "DAMAGED",
+            "description": "Damaged rain gauge or review required"
+          },
+          "alat rusak (9999)": {
+            "rainfall_mm": null,
+            "obs_status": "DAMAGED",
+            "description": "Damaged instrument flag"
+          }
+        },
+        "string_sanitizations": [
+          {
+            "regex": "^(\\d+)-$",
+            "replacement": "\\1.0",
+            "description": "Strip trailing hyphen typo (e.g. '1-' -> 1.0)"
+          },
+          {
+            "regex": "^(\\d+\\.?\\d*)\\.$",
+            "replacement": "\\1",
+            "description": "Strip trailing dot typo (e.g. '0.4.' -> 0.4)"
+          },
+          {
+            "regex": "^\\.$",
+            "replacement": "0.0",
+            "description": "Convert standalone dot to 0.0"
+          }
+        ]
+      },
+      "sheets_inventory": [
+        {
+          "workbook": "Kabupaten Dabo Singkep.xlsx",
+          "sheet_name": "00_Dabo Singkep",
+          "clean_name": "Dabo Singkep",
+          "station_id": "21040101a",
+          "station_name_master": "Stamet Dabo Singkep",
+          "regency_master": "Kab. Lingga",
+          "start_date": "1981-01-01",
+          "end_date": "2026-08-10",
+          "total_rows": 16804
+        },
+        {
+          "workbook": "Kabupaten Dabo Singkep.xlsx",
+          "sheet_name": "01_Dinas Pertanian Lingga",
+          "clean_name": "Dinas Pertanian Lingga",
+          "station_id": "21040203a",
+          "station_name_master": "Dinas Pertanian Kab. Lingga",
+          "regency_master": "Kab. Lingga",
+          "start_date": "1981-01-01",
+          "end_date": "2026-08-10",
+          "total_rows": 16803
+        },
+        {
+          "workbook": "Kabupaten Dabo Singkep.xlsx",
+          "sheet_name": "02_Bukit Langkap",
+          "clean_name": "Bukit Langkap",
+          "station_id": "21040201a",
+          "station_name_master": "Bukit Langkap",
+          "regency_master": "Kab. Lingga",
+          "start_date": "1981-01-01",
+          "end_date": "2026-08-10",
+          "total_rows": 16659
+        },
+        {
+          "workbook": "Kabupaten Dabo Singkep.xlsx",
+          "sheet_name": "03_Resun",
+          "clean_name": "Resun",
+          "station_id": "21040202a",
+          "station_name_master": "Resun",
+          "regency_master": "Kab. Lingga",
+          "start_date": "1981-01-01",
+          "end_date": "2026-08-10",
+          "total_rows": 16659
+        },
+        {
+          "workbook": "Kabupaten Dabo Singkep.xlsx",
+          "sheet_name": "04_Duara",
+          "clean_name": "Duara",
+          "station_id": "21040501a",
+          "station_name_master": "Duara",
+          "regency_master": "Kab. Lingga",
+          "start_date": "1981-01-01",
+          "end_date": "2026-08-10",
+          "total_rows": 16659
+        },
+        {
+          "workbook": "Kabupaten Dabo Singkep.xlsx",
+          "sheet_name": "05_Bukit Belah Raya",
+          "clean_name": "Bukit Belah Raya",
+          "station_id": "21040402a",
+          "station_name_master": "Bukit Belah Raya",
+          "regency_master": "Kab. Lingga",
+          "start_date": "1981-01-01",
+          "end_date": "2026-08-10",
+          "total_rows": 16659
+        },
+        {
+          "workbook": "Kabupaten Dabo Singkep.xlsx",
+          "sheet_name": "06_Sungai Buluh",
+          "clean_name": "Sungai Buluh",
+          "station_id": "21040401a",
+          "station_name_master": "Sungai Buluh",
+          "regency_master": "Kab. Lingga",
+          "start_date": "1981-01-01",
+          "end_date": "2026-08-10",
+          "total_rows": 16659
+        },
+        {
+          "workbook": "Kabupaten Dabo Singkep.xlsx",
+          "sheet_name": "07_ARG Tj. Harapan",
+          "clean_name": "ARG Tj. Harapan",
+          "station_id": "21040101b",
+          "station_name_master": "ARG Singkep",
+          "regency_master": "Kab. Lingga",
+          "start_date": "1981-01-01",
+          "end_date": "2026-07-31",
+          "total_rows": 16649
+        },
+        {
+          "workbook": "Kabupaten Karimun.xlsx",
+          "sheet_name": "00_Stamet TBK",
+          "clean_name": "Stamet TBK",
+          "station_id": "21020302a",
+          "station_name_master": "Stamet Raja Haji Abdullah",
+          "regency_master": "Kab. Karimun",
+          "start_date": "1994-01-01",
+          "end_date": "2026-08-10",
+          "total_rows": 11911
+        },
+        {
+          "workbook": "Kabupaten Karimun.xlsx",
+          "sheet_name": "01_Kapling Tebing",
+          "clean_name": "Kapling Tebing",
+          "station_id": "21020301a",
+          "station_name_master": "Kantor Lurah Kapling Tebing",
+          "regency_master": "Kab. Karimun",
+          "start_date": "1994-01-01",
+          "end_date": "2026-08-10",
+          "total_rows": 11911
+        },
+        {
+          "workbook": "Kabupaten Karimun.xlsx",
+          "sheet_name": "02_BPP Sememal",
+          "clean_name": "BPP Sememal",
+          "station_id": "21020401a",
+          "station_name_master": "BPP Sememal",
+          "regency_master": "Kab. Karimun",
+          "start_date": "1994-01-01",
+          "end_date": "2026-08-10",
+          "total_rows": 11911
+        },
+        {
+          "workbook": "Kabupaten Karimun.xlsx",
+          "sheet_name": "03_Tanjung Batu",
+          "clean_name": "Tanjung Batu",
+          "station_id": "21020201a",
+          "station_name_master": "UPTD BBI Tanjung Batu",
+          "regency_master": "Kab. Karimun",
+          "start_date": "1994-01-01",
+          "end_date": "2026-08-10",
+          "total_rows": 11911
+        },
+        {
+          "workbook": "Kabupaten Karimun.xlsx",
+          "sheet_name": "04_Kundur Utara",
+          "clean_name": "Kundur Utara",
+          "station_id": "21020701a",
+          "station_name_master": "Kantor Camat Kundur Utara",
+          "regency_master": "Kab. Karimun",
+          "start_date": "1994-01-01",
+          "end_date": "2026-08-10",
+          "total_rows": 11911
+        },
+        {
+          "workbook": "Kabupaten Karimun.xlsx",
+          "sheet_name": "05_Moro",
+          "clean_name": "Moro",
+          "station_id": "21020101a",
+          "station_name_master": "Kantor Camat Moro",
+          "regency_master": "Kab. Karimun",
+          "start_date": "1994-01-01",
+          "end_date": "2026-08-10",
+          "total_rows": 11911
+        },
+        {
+          "workbook": "Kabupaten Karimun.xlsx",
+          "sheet_name": "06_Pulau Buru",
+          "clean_name": "Pulau Buru",
+          "station_id": "21020601a",
+          "station_name_master": "Kantor BPP Kecamatan Buru",
+          "regency_master": "Kab. Karimun",
+          "start_date": "1994-01-01",
+          "end_date": "2026-08-10",
+          "total_rows": 11911
+        },
+        {
+          "workbook": "Kabupaten Natuna.xlsx",
+          "sheet_name": "00_Stamet Ranai Natuna",
+          "clean_name": "Stamet Ranai Natuna",
+          "station_id": "21030701a",
+          "station_name_master": "Stamet Ranai Natuna",
+          "regency_master": "Kab. Natuna",
+          "start_date": "2009-01-01",
+          "end_date": "2026-08-10",
+          "total_rows": 6432
+        },
+        {
+          "workbook": "Kabupaten Natuna.xlsx",
+          "sheet_name": "01_Padang Meliso",
+          "clean_name": "Padang Meliso",
+          "station_id": "21031801a",
+          "station_name_master": "Padang Meliso",
+          "regency_master": "Kab. Natuna",
+          "start_date": "2009-01-01",
+          "end_date": "2026-08-10",
+          "total_rows": 6432
+        },
+        {
+          "workbook": "Kabupaten Natuna.xlsx",
+          "sheet_name": "02_Bunguran Timur Laut",
+          "clean_name": "Bunguran Timur Laut",
+          "station_id": "21031501a",
+          "station_name_master": "Tanjung",
+          "regency_master": "Kab. Natuna",
+          "start_date": "2009-01-01",
+          "end_date": "2026-08-10",
+          "total_rows": 6432
+        },
+        {
+          "workbook": "Kabupaten Natuna.xlsx",
+          "sheet_name": "03_Bunguran Utara Kelarik",
+          "clean_name": "Bunguran Utara Kelarik",
+          "station_id": "21030801a",
+          "station_name_master": "Bunguran Utara Kelarik",
+          "regency_master": "Kab. Natuna",
+          "start_date": "2009-01-01",
+          "end_date": "2026-08-10",
+          "total_rows": 6432
+        },
+        {
+          "workbook": "Kabupaten Natuna.xlsx",
+          "sheet_name": "04_Bunguran Tengah Harapan Jaya",
+          "clean_name": "Bunguran Tengah Harapan Jaya",
+          "station_id": "21031601a",
+          "station_name_master": "Bunguran Tengah Harapan Jaya",
+          "regency_master": "Kab. Natuna",
+          "start_date": "2009-01-01",
+          "end_date": "2026-08-10",
+          "total_rows": 6432
+        },
+        {
+          "workbook": "Kabupaten Natuna.xlsx",
+          "sheet_name": "05_Pulau Tiga Sabang Mawang",
+          "clean_name": "Pulau Tiga Sabang Mawang",
+          "station_id": "21031101a",
+          "station_name_master": "Sabang Mawang",
+          "regency_master": "Kab. Natuna",
+          "start_date": "2009-01-01",
+          "end_date": "2026-08-10",
+          "total_rows": 6432
+        },
+        {
+          "workbook": "Kabupaten Natuna.xlsx",
+          "sheet_name": "06_Serasan Hilir",
+          "clean_name": "Serasan Hilir",
+          "station_id": "21030601a",
+          "station_name_master": "Hilir",
+          "regency_master": "Kab. Natuna",
+          "start_date": "2009-01-01",
+          "end_date": "2026-08-10",
+          "total_rows": 6432
+        },
+        {
+          "workbook": "Kabupaten Natuna.xlsx",
+          "sheet_name": "07_Subi Melia",
+          "clean_name": "Subi Melia",
+          "station_id": "21030901a",
+          "station_name_master": "Melia",
+          "regency_master": "Kab. Natuna",
+          "start_date": "2009-01-01",
+          "end_date": "2026-08-10",
+          "total_rows": 6432
+        },
+        {
+          "workbook": "Kabupaten Natuna.xlsx",
+          "sheet_name": "08_Midai Sabang Barat",
+          "clean_name": "Midai Sabang Barat",
+          "station_id": "21030401a",
+          "station_name_master": "Sabang Barat",
+          "regency_master": "Kab. Natuna",
+          "start_date": "2009-01-01",
+          "end_date": "2026-08-10",
+          "total_rows": 6432
+        },
+        {
+          "workbook": "Kabupaten Natuna.xlsx",
+          "sheet_name": "09_Pulau Laut Air Payang",
+          "clean_name": "Pulau Laut Air Payang",
+          "station_id": "21031001a",
+          "station_name_master": "Air Payang",
+          "regency_master": "Kab. Natuna",
+          "start_date": "2009-01-01",
+          "end_date": "2026-08-10",
+          "total_rows": 6432
+        },
+        {
+          "workbook": "Kabupaten Natuna.xlsx",
+          "sheet_name": "10_Sedanau Kp Balau",
+          "clean_name": "Sedanau Kp Balau",
+          "station_id": "21030501a",
+          "station_name_master": "Sedanau Kp Balau",
+          "regency_master": "Kab. Natuna",
+          "start_date": "2009-01-01",
+          "end_date": "2026-08-10",
+          "total_rows": 6432
+        },
+        {
+          "workbook": "Kabupaten Natuna.xlsx",
+          "sheet_name": "11_Batubi",
+          "clean_name": "Batubi",
+          "station_id": "21032001a",
+          "station_name_master": "Batubi",
+          "regency_master": "Kab. Natuna",
+          "start_date": "2009-01-01",
+          "end_date": "2026-08-10",
+          "total_rows": 6432
+        },
+        {
+          "workbook": "Kabupaten Natuna.xlsx",
+          "sheet_name": "12_Mekar Jaya",
+          "clean_name": "Mekar Jaya",
+          "station_id": "21030502a",
+          "station_name_master": "Mekar Jaya",
+          "regency_master": "Kab. Natuna",
+          "start_date": "2009-01-01",
+          "end_date": "2026-08-10",
+          "total_rows": 6432
+        },
+        {
+          "workbook": "Kabupaten Natuna.xlsx",
+          "sheet_name": "13_Selemut Cemaga",
+          "clean_name": "Selemut Cemaga",
+          "station_id": "21031802a",
+          "station_name_master": "Selemut",
+          "regency_master": "Kab. Natuna",
+          "start_date": "2009-01-01",
+          "end_date": "2026-08-10",
+          "total_rows": 6432
+        },
+        {
+          "workbook": "Kabupaten Natuna.xlsx",
+          "sheet_name": "14_Teluk Buton",
+          "clean_name": "Teluk Buton",
+          "station_id": "21030802a",
+          "station_name_master": "Teluk Buton",
+          "regency_master": "Kab. Natuna",
+          "start_date": "2009-01-01",
+          "end_date": "2026-08-10",
+          "total_rows": 6432
+        },
+        {
+          "workbook": "Kabupaten Tarempa.xlsx",
+          "sheet_name": "00_Stamet Tarempa",
+          "clean_name": "Stamet Tarempa",
+          "station_id": "21050101a",
+          "station_name_master": "Stamet Tarempa",
+          "regency_master": "Kab. Kepulauan Anambas",
+          "start_date": "1991-01-01",
+          "end_date": "2026-08-10",
+          "total_rows": 13007
+        },
+        {
+          "workbook": "Kabupaten Tarempa.xlsx",
+          "sheet_name": "01_Langir",
+          "clean_name": "Langir",
+          "station_id": "21050201a",
+          "station_name_master": "Langir",
+          "regency_master": "Kab. Kepulauan Anambas",
+          "start_date": "1991-01-01",
+          "end_date": "2026-08-10",
+          "total_rows": 13007
+        },
+        {
+          "workbook": "Kabupaten Tarempa.xlsx",
+          "sheet_name": "02_UPT Benih Pertanian",
+          "clean_name": "UPT Benih Pertanian",
+          "station_id": "21050501a",
+          "station_name_master": "Bukit Padi",
+          "regency_master": "Kab. Kepulauan Anambas",
+          "start_date": "1991-01-01",
+          "end_date": "2026-08-10",
+          "total_rows": 13007
+        },
+        {
+          "workbook": "Kota Batam.xlsx",
+          "sheet_name": "00_Stamet Hang Nadim",
+          "clean_name": "Stamet Hang Nadim",
+          "station_id": "21710401a",
+          "station_name_master": "Stamet Hang Nadim Batam",
+          "regency_master": "Kota Batam",
+          "start_date": "1993-01-01",
+          "end_date": "2026-08-10",
+          "total_rows": 12276
+        },
+        {
+          "workbook": "Kota Batam.xlsx",
+          "sheet_name": "01_BP Sei Temiang",
+          "clean_name": "BP Sei Temiang",
+          "station_id": "21710301a",
+          "station_name_master": "BP Sei Temiang",
+          "regency_master": "Kota Batam",
+          "start_date": "1993-01-01",
+          "end_date": "2026-08-10",
+          "total_rows": 12276
+        },
+        {
+          "workbook": "Kota Tanjungpinang.xlsx",
+          "sheet_name": "00_RHF Tanjungpinang",
+          "clean_name": "RHF Tanjungpinang",
+          "station_id": "21720201a",
+          "station_name_master": "Stamet Raja Haji Fisabilillah",
+          "regency_master": "Kota Tanjung Pinang",
+          "start_date": "1976-01-01",
+          "end_date": "2024-07-19",
+          "total_rows": 17734
+        },
+        {
+          "workbook": "Kota Tanjungpinang.xlsx",
+          "sheet_name": "01_Lancang Kuning",
+          "clean_name": "Lancang Kuning",
+          "station_id": "21010701a",
+          "station_name_master": "Bintan Utara",
+          "regency_master": "Kab. Bintan",
+          "start_date": "1976-01-01",
+          "end_date": "2024-07-19",
+          "total_rows": 17734
+        },
+        {
+          "workbook": "Kota Tanjungpinang.xlsx",
+          "sheet_name": "02_Ekang Anculai",
+          "clean_name": "Ekang Anculai",
+          "station_id": "21011001a",
+          "station_name_master": "Ekang Anculai",
+          "regency_master": "Kab. Bintan",
+          "start_date": "1976-01-01",
+          "end_date": "2024-07-19",
+          "total_rows": 17734
+        },
+        {
+          "workbook": "Kota Tanjungpinang.xlsx",
+          "sheet_name": "03_Poyotomo",
+          "clean_name": "Poyotomo",
+          "station_id": "21011002a",
+          "station_name_master": "Poyotomo",
+          "regency_master": "Kab. Bintan",
+          "start_date": "1976-01-01",
+          "end_date": "2024-07-19",
+          "total_rows": 17734
+        },
+        {
+          "workbook": "Kota Tanjungpinang.xlsx",
+          "sheet_name": "04_Bintan Buyu",
+          "clean_name": "Bintan Buyu",
+          "station_id": "21010801a",
+          "station_name_master": "Bintan Buyu",
+          "regency_master": "Kab. Bintan",
+          "start_date": "1976-01-01",
+          "end_date": "2024-07-19",
+          "total_rows": 17734
+        },
+        {
+          "workbook": "Kota Tanjungpinang.xlsx",
+          "sheet_name": "05_Batu 18 Kijang",
+          "clean_name": "Batu 18 Kijang",
+          "station_id": "21010601a",
+          "station_name_master": "Batu 18 Kijang",
+          "regency_master": "Kab. Bintan",
+          "start_date": "1976-01-01",
+          "end_date": "2024-07-19",
+          "total_rows": 17734
+        },
+        {
+          "workbook": "Kota Tanjungpinang.xlsx",
+          "sheet_name": "06_Sungai Enam",
+          "clean_name": "Sungai Enam",
+          "station_id": "21010602a",
+          "station_name_master": "Sungai Enam",
+          "regency_master": "Kab. Bintan",
+          "start_date": "1976-01-01",
+          "end_date": "2024-07-19",
+          "total_rows": 17734
+        },
+        {
+          "workbook": "Kota Tanjungpinang.xlsx",
+          "sheet_name": "07_Toapaya",
+          "clean_name": "Toapaya",
+          "station_id": "21011201a",
+          "station_name_master": "Toapaya Asri",
+          "regency_master": "Kab. Bintan",
+          "start_date": "1976-01-01",
+          "end_date": "2024-07-19",
+          "total_rows": 17734
+        },
+        {
+          "workbook": "Kota Tanjungpinang.xlsx",
+          "sheet_name": "08_Kawal",
+          "clean_name": "Kawal",
+          "station_id": "21010401a",
+          "station_name_master": "Kawal",
+          "regency_master": "Kab. Bintan",
+          "start_date": "1976-01-01",
+          "end_date": "2024-07-19",
+          "total_rows": 17734
+        },
+        {
+          "workbook": "Kota Tanjungpinang.xlsx",
+          "sheet_name": "09_Malang rapat",
+          "clean_name": "Malang rapat",
+          "station_id": "21010402a",
+          "station_name_master": "Malang Rapat",
+          "regency_master": "Kab. Bintan",
+          "start_date": "1976-01-01",
+          "end_date": "2024-07-19",
+          "total_rows": 17734
+        },
+        {
+          "workbook": "Kota Tanjungpinang.xlsx",
+          "sheet_name": "10_Berakit",
+          "clean_name": "Berakit",
+          "station_id": "21011003a",
+          "station_name_master": "Berakit",
+          "regency_master": "Kab. Bintan",
+          "start_date": "1976-01-01",
+          "end_date": "2024-07-19",
+          "total_rows": 17734
+        },
+        {
+          "workbook": "Kota Tanjungpinang.xlsx",
+          "sheet_name": "11_Teluk Sasa",
+          "clean_name": "Teluk Sasa",
+          "station_id": "21011501a",
+          "station_name_master": "Teluk Sasa",
+          "regency_master": "Kab. Bintan",
+          "start_date": "1976-01-01",
+          "end_date": "2024-07-19",
+          "total_rows": 17734
+        },
+        {
+          "workbook": "Kota Tanjungpinang.xlsx",
+          "sheet_name": "12_Sebung Pereh",
+          "clean_name": "Sebung Pereh",
+          "station_id": "21011004a",
+          "station_name_master": "Sebung Pereh",
+          "regency_master": "Kab. Bintan",
+          "start_date": "1976-01-01",
+          "end_date": "2024-07-19",
+          "total_rows": 17734
+        },
+        {
+          "workbook": "Kota Tanjungpinang.xlsx",
+          "sheet_name": "13_Senggarang",
+          "clean_name": "Senggarang",
+          "station_id": "21720301a",
+          "station_name_master": "Senggarang",
+          "regency_master": "Kota Tanjung Pinang",
+          "start_date": "1976-01-01",
+          "end_date": "2024-07-19",
+          "total_rows": 17734
+        },
+        {
+          "workbook": "Kota Tanjungpinang.xlsx",
+          "sheet_name": "14_RRI Tanjungpinang",
+          "clean_name": "RRI Tanjungpinang",
+          "station_id": "21720302a",
+          "station_name_master": "Bukit Bestari",
+          "regency_master": "Kota Tanjung Pinang",
+          "start_date": "1976-01-01",
+          "end_date": "2024-07-19",
+          "total_rows": 17734
+        },
+        {
+          "workbook": "Kota Tanjungpinang.xlsx",
+          "sheet_name": "15_Galang Batang",
+          "clean_name": "Galang Batang",
+          "station_id": "21010403a",
+          "station_name_master": "Galang Batang",
+          "regency_master": "Kab. Bintan",
+          "start_date": "1976-01-01",
+          "end_date": "2024-07-19",
+          "total_rows": 17734
+        },
+        {
+          "workbook": "Kota Tanjungpinang.xlsx",
+          "sheet_name": "16_Dompak",
+          "clean_name": "Dompak",
+          "station_id": "21720401a",
+          "station_name_master": "Dompak",
+          "regency_master": "Kota Tanjung Pinang",
+          "start_date": "1976-01-01",
+          "end_date": "2024-07-19",
+          "total_rows": 17734
+        },
+        {
+          "workbook": "Kota Tanjungpinang.xlsx",
+          "sheet_name": "17_Ria Bintan Lagoi",
+          "clean_name": "Ria Bintan Lagoi",
+          "station_id": "21010702a",
+          "station_name_master": "Ria Bintan Lagoi",
+          "regency_master": "Kab. Bintan",
+          "start_date": "1976-01-01",
+          "end_date": "2024-07-19",
+          "total_rows": 17734
+        }
+      ],
+      "missing_master_arg_stations": [
+        {
+          "station_id": "21010603b",
+          "name": "ARG Kijang",
+          "regency": "Kab. Bintan"
+        },
+        {
+          "station_id": "21010802b",
+          "name": "ARG Teluk Sebong",
+          "regency": "Kab. Bintan"
+        },
+        {
+          "station_id": "21020402b",
+          "name": "ARG Karimun",
+          "regency": "Kab. Karimun"
+        },
+        {
+          "station_id": "21710501b",
+          "name": "ARG Hang Nadim",
+          "regency": "Kota Batam"
+        }
+      ]
+    },
+    "spi": {
+      "category_name": "Standardized Precipitation Index (SPI)",
+      "file_patterns": [
+        "spi/2026_SPI.xlsx"
+      ],
+      "ignore_patterns": [
+        "*~$*",
+        "*.tmp"
+      ],
+      "supported_timescale": "30D_MONTHLY",
+      "unsupported_timescales": [
+        "30D_DASARIAN",
+        "90D_DASARIAN",
+        "90D_MONTHLY"
+      ],
+      "operational_critical_notice": "The template file 2026_SPI.xlsx provides ONLY Monthly SPI-1 (30D). CEWS operational rules require Dasarian SPI-30D and SPI-90D at cutoff dates (1, 11, 21). Ingestion engine must either support a dedicated Dasarian SPI template or calculate SPI dasarian from rainfall.",
+      "sheets": {
+        "fast step": {
+          "type": "scratch_worksheet",
+          "ingest": false
+        },
+        "Analisis": {
+          "type": "spi_analysis_data",
+          "ingest": true,
+          "header_rows": [
+            1,
+            2
+          ],
+          "data_start_row": 3
+        },
+        "Prakiraan": {
+          "type": "spi_forecast_data",
+          "ingest": true,
+          "header_rows": [
+            1,
+            2
+          ],
+          "data_start_row": 3
+        },
+        "SPI GIS": {
+          "type": "spatial_export",
+          "ingest": false
+        }
+      },
+      "tabular_structure": {
+        "fixed_metadata_columns": [
+          {
+            "index_0_based": 0,
+            "name": "Kode Stasiun",
+            "type": "string",
+            "example": "TNJ000"
+          },
+          {
+            "index_0_based": 1,
+            "name": "No Stasiun",
+            "type": "string",
+            "example": "00096091a"
+          },
+          {
+            "index_0_based": 2,
+            "name": "Jenis Stasiun",
+            "type": "string",
+            "notes": "Contains station name",
+            "example": "Stasiun Meteorologi RHF Tanjungpinang"
+          },
+          {
+            "index_0_based": 3,
+            "name": "Lintang",
+            "type": "float",
+            "example": 0.9227
+          },
+          {
+            "index_0_based": 4,
+            "name": "Bujur",
+            "type": "float",
+            "example": 104.5288
+          }
+        ],
+        "time_blocks": [
+          "Januari",
+          "Februari",
+          "Maret",
+          "April",
+          "Mei",
+          "Juni",
+          "Juli",
+          "Agustus",
+          "September",
+          "Oktober",
+          "November",
+          "Desember"
+        ],
+        "sub_columns_per_month": [
+          {
+            "sub_index": 0,
+            "name": "Indeks",
+            "type": "float",
+            "description": "SPI numerical index"
+          },
+          {
+            "sub_index": 1,
+            "name": "Kriteria",
+            "type": "string",
+            "description": "BMKG classification category"
+          }
+        ],
+        "valid_criteria_labels": [
+          "Sangat Kering",
+          "Kering",
+          "Agak Kering",
+          "Normal",
+          "Agak Basah",
+          "Basah",
+          "Sangat Basah"
+        ]
+      },
+      "station_code_corrections": {
+        "210310802a": {
+          "corrected_station_id": "21031802a",
+          "station_name": "Selemut Cemaga",
+          "reason": "Typo in template: extra zero digit vs master station ID"
+        },
+        "00096091a": {
+          "corrected_station_id": "21720101a",
+          "station_name": "Stamet RHF Tanjungpinang",
+          "reason": "WMO code alias"
+        },
+        "00096109a": {
+          "corrected_station_id": "21040101a",
+          "station_name": "Stamet Dabo Singkep",
+          "reason": "WMO code alias"
+        },
+        "00096171a": {
+          "corrected_station_id": "21030101a",
+          "station_name": "Stamet Ranai Natuna",
+          "reason": "WMO code alias"
+        },
+        "00096179a": {
+          "corrected_station_id": "21050101a",
+          "station_name": "Stamet Tarempa Anambas",
+          "reason": "WMO code alias"
+        },
+        "00096172a": {
+          "corrected_station_id": "21020101a",
+          "station_name": "Stamet Raja Haji Abdullah Karimun",
+          "reason": "WMO code alias"
+        },
+        "00096173a": {
+          "corrected_station_id": "21710101a",
+          "station_name": "Stamet Hang Nadim Batam",
+          "reason": "WMO code alias"
+        }
+      }
+    },
+    "probabilitas": {
+      "category_name": "Probabilitas Prakiraan Curah Hujan ECMWF",
+      "file_patterns": [
+        "prob/dasarian/*.xlsx",
+        "prob/bulanan/*.xlsx"
+      ],
+      "ignore_patterns": [
+        "*~$*",
+        "*.tmp"
+      ],
+      "scale_specification": {
+        "unit": "percent",
+        "range": [
+          0.0,
+          100.0
+        ],
+        "ingestion_rule": "VALUES_ARE_ALREADY_PERCENT_DO_NOT_MULTIPLY_BY_100",
+        "source_ensemble_size": 51
+      },
+      "dasarian_config": {
+        "file_example": "prob/dasarian/KEPRI_pch_ecmwf_perpos_ver_2026.04.30.xlsx",
+        "active_grid_sheets": [
+          "EnsMean",
+          "pb20",
+          "pb50",
+          "pb100",
+          "pb150",
+          "pa50",
+          "pa100",
+          "pa150",
+          "pa200",
+          "pa250",
+          "pa300"
+        ],
+        "decision_engine_rules": {
+          "PDKM": {
+            "variable": "pb20",
+            "description": "Probability of Dasarian Rainfall < 20mm for Meteorological Drought Early Warning"
+          },
+          "PDCHT_WASPADA": {
+            "variable": "pa150",
+            "description": "Probability of Dasarian Rainfall > 150mm"
+          },
+          "PDCHT_SIAGA": {
+            "variable": "pa200",
+            "description": "Probability of Dasarian Rainfall > 200mm"
+          },
+          "PDCHT_AWAS": {
+            "variable": "pa300",
+            "description": "Probability of Dasarian Rainfall > 300mm"
+          }
+        }
+      },
+      "bulanan_config": {
+        "file_example": "prob/bulanan/KEPRI_pch_ecmwf_perpos_ver_2026.08.01.xlsx",
+        "active_grid_sheets": [
+          "EnsMean",
+          "pb50",
+          "pb100",
+          "pb150",
+          "pa50",
+          "pa100",
+          "pa150",
+          "pa200",
+          "pa300",
+          "pa400",
+          "pa500"
+        ],
+        "decision_engine_rules": {
+          "PDCHT_WASPADA": {
+            "variable": "pa300",
+            "description": "Probability of Monthly Rainfall > 300mm"
+          },
+          "PDCHT_SIAGA": {
+            "variable": "pa400",
+            "description": "Probability of Monthly Rainfall > 400mm"
+          },
+          "PDCHT_AWAS": {
+            "variable": "pa500",
+            "description": "Probability of Monthly Rainfall > 500mm"
+          }
+        },
+        "historical_anomaly_note": "Sheet EnsMean in bulanan template starts at month 2 (e.g. Sep) omitting the first month (e.g. Agt), whereas probability sheets (pb50..pa500) include all 7 months. Parser must handle irregular leading column in EnsMean."
+      },
+      "column_layout": [
+        {
+          "index_1_based": 1,
+          "name": "NOPOS",
+          "type": "string",
+          "description": "BMKG station post code (e.g. 246Z)"
+        },
+        {
+          "index_1_based": 2,
+          "name": "KECAMATAN-POSHUJAN",
+          "type": "string",
+          "description": "Subdistrict and station post name"
+        },
+        {
+          "index_1_based": 3,
+          "name": "LON",
+          "type": "float",
+          "description": "Longitude"
+        },
+        {
+          "index_1_based": 4,
+          "name": "LAT",
+          "type": "float",
+          "description": "Latitude"
+        },
+        {
+          "index_1_based": 5,
+          "name": "PROV",
+          "type": "string",
+          "description": "Province (KEPRI)"
+        },
+        {
+          "index_1_based": 6,
+          "name": "KAB",
+          "type": "string",
+          "description": "Regency / City"
+        },
+        {
+          "index_1_based": 7,
+          "name": "URUTKAB",
+          "type": "integer",
+          "description": "Order number in regency"
+        },
+        {
+          "index_1_based": 8,
+          "name": "FORECAST_PERIOD_COLUMNS",
+          "type": "float",
+          "description": "Probability values in percent (0.0 to 100.0)"
+        }
+      ],
+      "station_mapping_reference": "data/reference/stations/mapping_tambahan.xlsx",
+      "unmapped_external_stations": [
+        {
+          "nopos": "228R",
+          "name": "Tanjung Riau Kota Batam",
+          "action": "IGNORE_AND_LOG",
+          "reason": "Outside CEWS 57 stations master scope"
+        }
+      ],
+      "missing_manual_stations": [
+        {
+          "station_id": "21050501a",
+          "name": "UPT Benih Pertanian",
+          "regency": "Kab. Kepulauan Anambas",
+          "action": "IMPUTE_OR_SET_MISSING_PROB",
+          "reason": "Station not present in ECMWF forecast workbook"
+        }
+      ]
+    }
+  },
+  "storage_targets": {
+    "daily_rainfall": {
+      "engine": "MariaDB",
+      "table_name": "daily_rainfall",
+      "primary_key": [
+        "station_id",
+        "date"
+      ],
+      "idempotency_strategy": "INSERT INTO daily_rainfall (station_id, date, rainfall_mm, obs_status) VALUES (...) ON DUPLICATE KEY UPDATE rainfall_mm = VALUES(rainfall_mm), obs_status = VALUES(obs_status)"
+    },
+    "spi_store": {
+      "engine": "Parquet",
+      "paths": [
+        "data/processed/spi/SPI_all_30d.parquet",
+        "data/processed/spi/SPI_all_90d.parquet"
+      ],
+      "schema": {
+        "station_id": "string",
+        "date": "date32",
+        "spi": "float64",
+        "category": "string"
+      }
+    },
+    "probability_store": {
+      "engine": "Parquet/JSON",
+      "path_pattern": "data/processed/probability/{period_type}_{cutoff_date}.parquet"
+    }
+  }
+}

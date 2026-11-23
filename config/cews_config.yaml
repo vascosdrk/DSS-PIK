@@ -1,0 +1,5 @@
+mode: backtest
+start_date: '2025-01-01'
+end_date: '2025-12-31'
+data_version: '2026_DASARIAN_1'
+output_path: ../output/cews_indicator_dataset.parquet
