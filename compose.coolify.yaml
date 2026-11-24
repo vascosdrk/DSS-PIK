@@ -1,0 +1,118 @@
+# ==============================================================================
+# DSS-PIK — Docker Compose untuk Coolify (Application, build pack "Docker Compose")
+#
+# Coolify membangun file ini dari checkout repo setiap ada push ke main.
+# compose.yaml tetap dipakai untuk server biasa dengan `docker compose`.
+#
+# Perbedaan dengan compose.yaml:
+#   - Tanpa port host: proxy Coolify meneruskan domain publik ke frontend:80.
+#   - /app/data memakai named volume (server Coolify tidak punya folder ./data).
+#   - Tanpa network khusus: Coolify menyambungkan proxy-nya ke network default.
+#   - Saat start, backend menulis config/lan_access_policy.json dari
+#     DSS_PIK_LAN_ALLOWED. Di belakang Coolify backend hanya melihat IP Docker
+#     privat milik proxy, jadi tanpa policy setiap request mendapat 403.
+#
+# Isi di Coolify > Environment Variables (oleh admin server, bukan di repo):
+#   wajib:    CEWS_DB_PASSWORD, MARIADB_ROOT_PASSWORD, DSS_PIK_SESSION_SECRET,
+#             DSS_PIK_USERNAME, DSS_PIK_PASSWORD
+#   opsional: CEWS_DB_NAME, CEWS_DB_USER, DSS_PIK_LAN_ALLOWED,
+#             CEWS_TRUSTED_PROXY_CIDRS
+# ==============================================================================
+
+services:
+  mariadb:
+    image: mariadb:11.4
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${CEWS_DB_NAME:-cews_db}
+      MARIADB_USER: ${CEWS_DB_USER:-dsspik_app}
+      MARIADB_PASSWORD: ${CEWS_DB_PASSWORD:?Set CEWS_DB_PASSWORD}
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:?Set MARIADB_ROOT_PASSWORD}
+      TZ: Asia/Jakarta
+    volumes:
+      - dss_pik_mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    # Tulis LAN access policy, lalu jalankan API persis seperti CMD di Dockerfile.
+    # "$$" adalah escape Compose untuk karakter "$".
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        if [ -n "$${DSS_PIK_LAN_ALLOWED}" ]; then
+        python - <<'PY'
+        import json, os
+        nets = [s.strip() for s in os.environ["DSS_PIK_LAN_ALLOWED"].split(",") if s.strip()]
+        policy = {"lan_enabled": True, "approved_remote_addresses": nets,
+                  "rule_name": "DSS-PIK - LAN Access", "local_port": 8000, "updated_at": None}
+        with open("/app/config/lan_access_policy.json", "w") as f:
+            f.write(json.dumps(policy, indent=2) + "\n")
+        print("LAN policy enabled for:", ", ".join(nets))
+        PY
+        fi
+        exec uvicorn backend.main:app --host 0.0.0.0 --port 8000 --proxy-headers
+    environment:
+      CEWS_DB_HOST: mariadb
+      CEWS_DB_PORT: 3306
+      CEWS_DB_NAME: ${CEWS_DB_NAME:-cews_db}
+      CEWS_DB_USER: ${CEWS_DB_USER:-dsspik_app}
+      CEWS_DB_PASSWORD: ${CEWS_DB_PASSWORD:?Set CEWS_DB_PASSWORD}
+      CEWS_SERVE_FRONTEND: "false"
+      CEWS_PORT: 8000
+      CEWS_DOCKER_LOCAL_ONLY: "false"
+      CEWS_TRUSTED_PROXY_CIDRS: ${CEWS_TRUSTED_PROXY_CIDRS:-10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
+      DSS_PIK_LAN_ALLOWED: ${DSS_PIK_LAN_ALLOWED:-10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
+      DSS_PIK_USERNAME: ${DSS_PIK_USERNAME:-}
+      DSS_PIK_PASSWORD: ${DSS_PIK_PASSWORD:-}
+      DSS_PIK_PASSWORD_HASH: ${DSS_PIK_PASSWORD_HASH:-}
+      DSS_PIK_SESSION_SECRET: ${DSS_PIK_SESSION_SECRET:?Set DSS_PIK_SESSION_SECRET}
+      TZ: Asia/Jakarta
+    volumes:
+      - dss_pik_data:/app/data
+      - dss_pik_maps_output:/app/data/operational/maps
+      - dss_pik_sih3_output:/app/data/output
+      - dss_pik_runtime_logs:/app/logs/runtime
+      - dss_pik_outputs:/app/outputs
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    expose:
+      - "80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:80/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  dss_pik_mariadb_data:
+  dss_pik_data:
+  dss_pik_maps_output:
+  dss_pik_sih3_output:
+  dss_pik_runtime_logs:
+  dss_pik_outputs:
