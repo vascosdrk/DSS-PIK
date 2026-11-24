@@ -79,11 +79,15 @@ openssl rand -hex 32
 
 # Generate password database kuat (buat dua nilai berbeda untuk app & root):
 openssl rand -base64 24
-
-# Generate bcrypt hash operator (bungkus dengan tanda kutip tunggal '...' di .env.production):
-docker compose --env-file .env.production run --rm backend \
-  python -c "import bcrypt, getpass; print(bcrypt.hashpw(getpass.getpass().encode(), bcrypt.gensalt()).decode())"
 ```
+
+Isi akun administrator unik pada `.env.production` (backend otomatis melakukan bcrypt hash satu kali di memori saat startup):
+```env
+DSS_PIK_USERNAME=your_admin_username
+DSS_PIK_PASSWORD=your_own_strong_password
+DSS_PIK_SESSION_SECRET=<hasil_openssl_rand_hex_32>
+```
+*(Kompatibilitas legacy: `DSS_PIK_PASSWORD_HASH` tetap didukung sementara jika `DSS_PIK_PASSWORD` tidak disetel.)*
 
 Pastikan pada `.env.production`:
 - `CEWS_DOCKER_LOCAL_ONLY=false`

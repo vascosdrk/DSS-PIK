@@ -9,6 +9,7 @@ import json
 import hmac
 import hashlib
 import base64
+import secrets
 import uuid
 from pathlib import Path
 from typing import Optional, Dict, Any
@@ -16,15 +17,75 @@ from dotenv import load_dotenv
 from fastapi import Request, HTTPException, status
 import bcrypt
 
-# Load environment variables from .env file
+# Load environment variables from .env file (without overriding process env)
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
-DSS_PIK_USERNAME = os.environ.get("DSS_PIK_USERNAME", "klimatkepri")
-DSS_PIK_PASSWORD_HASH = os.environ.get("DSS_PIK_PASSWORD_HASH", "")
-DSS_PIK_SESSION_SECRET = os.environ.get("DSS_PIK_SESSION_SECRET", "dss_pik_secret_fallback_key")
 SESSION_COOKIE_NAME = "dss_pik_session"
 SESSION_DURATION_SECONDS = 12 * 3600  # 12 hours
+
+# Runtime in-memory auth state (populated once at startup via reload_auth_config)
+DSS_PIK_USERNAME: str = ""
+DSS_PIK_PASSWORD_HASH: str = ""
+DSS_PIK_SESSION_SECRET: str = ""
+_AUTH_MODE: str = "unconfigured"
+
+
+def reload_auth_config() -> None:
+    """
+    Initialize authentication configuration from environment variables once at startup.
+    - Primary mechanism: DSS_PIK_PASSWORD (hashed once with bcrypt into process memory).
+    - Legacy fallback: DSS_PIK_PASSWORD_HASH (preserved for backward compatibility).
+    - Never logs plaintext passwords, hashes, or session secrets.
+    - Never uses a publicly known default password or fallback session secret.
+    """
+    global DSS_PIK_USERNAME, DSS_PIK_PASSWORD_HASH, DSS_PIK_SESSION_SECRET, _AUTH_MODE
+
+    username = os.environ.get("DSS_PIK_USERNAME", "").strip()
+    plain_password = os.environ.get("DSS_PIK_PASSWORD", "")
+    legacy_hash = os.environ.get("DSS_PIK_PASSWORD_HASH", "").strip()
+    session_secret = os.environ.get("DSS_PIK_SESSION_SECRET", "").strip()
+
+    DSS_PIK_USERNAME = username
+    if not DSS_PIK_USERNAME:
+        print("[AUTH CONFIG WARNING] DSS_PIK_USERNAME is empty. Login will be rejected until configured in .env.")
+
+    if plain_password:
+        if legacy_hash:
+            print(
+                "[AUTH CONFIG WARNING] Both DSS_PIK_PASSWORD and legacy DSS_PIK_PASSWORD_HASH are set. "
+                "Using DSS_PIK_PASSWORD as primary and ignoring DSS_PIK_PASSWORD_HASH."
+            )
+        # Hash once at startup and store only in process memory
+        DSS_PIK_PASSWORD_HASH = bcrypt.hashpw(
+            plain_password.encode("utf-8"),
+            bcrypt.gensalt(),
+        ).decode("utf-8")
+        _AUTH_MODE = "env_password"
+    elif legacy_hash:
+        DSS_PIK_PASSWORD_HASH = legacy_hash
+        _AUTH_MODE = "legacy_hash"
+        print("[AUTH CONFIG INFO] Using legacy DSS_PIK_PASSWORD_HASH compatibility mode.")
+    else:
+        DSS_PIK_PASSWORD_HASH = ""
+        _AUTH_MODE = "unconfigured"
+        print(
+            "[AUTH CONFIG WARNING] Neither DSS_PIK_PASSWORD nor DSS_PIK_PASSWORD_HASH is configured. "
+            "Login will fail safely until credentials are set in .env."
+        )
+
+    if session_secret:
+        DSS_PIK_SESSION_SECRET = session_secret
+    else:
+        # Ephemeral per-process CSPRNG secret (never a publicly known hardcoded string)
+        DSS_PIK_SESSION_SECRET = secrets.token_hex(32)
+        print(
+            "[AUTH CONFIG WARNING] DSS_PIK_SESSION_SECRET is not set. "
+            "Generated an ephemeral per-process secret; configure a persistent unique 64-hex secret in .env."
+        )
+
+
+reload_auth_config()
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -36,13 +97,15 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
             plain_password.encode("utf-8"),
             hashed_password.encode("utf-8")
         )
-    except Exception as e:
-        print(f"[AUTH ERROR] Password verification exception: {e}")
+    except Exception:
+        print("[AUTH ERROR] Password verification failed due to invalid hash format.")
         return False
 
 
 def authenticate_user(username_in: str, password_in: str) -> bool:
-    """Validate user credentials against environment configuration."""
+    """Validate user credentials against in-memory startup bcrypt hash."""
+    if not DSS_PIK_USERNAME or not DSS_PIK_PASSWORD_HASH:
+        return False
     if not username_in or not password_in:
         return False
     # Username check (case-insensitive for operator friendliness)
