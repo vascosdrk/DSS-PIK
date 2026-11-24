@@ -3554,6 +3554,165 @@ def post_spi_generator_commit_endpoint(
 
 
 # ==============================================================================
+# RAINFALL DATA INPUT MODULE V2 (AUTO TEMPLATE DETECTION, MULTI-FORMAT & MANUAL)
+# ==============================================================================
+@app.get(
+    "/api/v1/rainfall/v2/regencies",
+    tags=["Rainfall Input V2"],
+    summary="List 7 Kepri regencies with template support matrix and master stations",
+)
+def rainfall_v2_regencies():
+    from backend.rainfall_ingestion_v2 import get_regencies_metadata
+    try:
+        return {"regencies": get_regencies_metadata()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gagal memuat daftar wilayah: {e}")
+
+
+@app.post(
+    "/api/v1/rainfall/v2/detect",
+    tags=["Rainfall Input V2"],
+    summary="Upload one or more Excel files for a regency and run automatic template detection",
+)
+async def rainfall_v2_detect(
+    regency_code: str = Form(..., description="Regency code: KARIMUN, LINGGA, NATUNA, ANAMBAS, BATAM, BINTAN, TANJUNGPINANG"),
+    files: List[UploadFile] = File(..., description="One or more Excel files (.xlsx, .xlsm)"),
+):
+    from backend.rainfall_ingestion_v2 import create_detect_batch_session
+    try:
+        payload = []
+        for f in files:
+            content = await f.read()
+            payload.append((f.filename or "uploaded.xlsx", content))
+        return create_detect_batch_session(regency_code=regency_code, files_payload=payload)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gagal mendeteksi format berkas: {e}")
+
+
+@app.get(
+    "/api/v1/rainfall/v2/profiles",
+    tags=["Rainfall Input V2"],
+    summary="List saved custom rainfall template profiles",
+)
+def rainfall_v2_list_profiles(regency_code: Optional[str] = Query(None)):
+    from backend.rainfall_ingestion_v2 import list_template_profiles
+    try:
+        return {"profiles": list_template_profiles(regency_code=regency_code)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gagal memuat profil template: {e}")
+
+
+@app.post(
+    "/api/v1/rainfall/v2/profiles",
+    tags=["Rainfall Input V2"],
+    summary="Save a new persistent custom template mapping profile and optional station aliases",
+)
+def rainfall_v2_save_profile(payload: Dict[str, Any]):
+    from backend.rainfall_ingestion_v2 import save_template_profile
+    try:
+        return save_template_profile(
+            profile_name=payload.get("profile_name", "Profil Kustom"),
+            regency_code=payload["regency_code"],
+            structure_fingerprint=payload["structure_fingerprint"],
+            sheet_rules=payload.get("sheet_rules", {}),
+            header_config=payload.get("header_config", {}),
+            date_config=payload.get("date_config", {}),
+            value_config=payload.get("value_config", {}),
+            station_config=payload.get("station_config", {}),
+            ignored_columns=payload.get("ignored_columns", []),
+            symbol_mapping=payload.get("symbol_mapping", {}),
+            station_aliases=payload.get("station_aliases"),
+            operator=payload.get("operator", "OPERATOR_BMKG"),
+        )
+    except (KeyError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gagal menyimpan profil template: {e}")
+
+
+@app.post(
+    "/api/v1/rainfall/v2/preview",
+    tags=["Rainfall Input V2"],
+    summary="Parse selected files with confirmed periods and compare against MariaDB",
+)
+def rainfall_v2_preview(payload: Dict[str, Any]):
+    from backend.rainfall_ingestion_v2 import preview_batch_session
+    try:
+        return preview_batch_session(
+            batch_session_id=payload["batch_session_id"],
+            file_configs=payload.get("files", []),
+        )
+    except (KeyError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gagal membuat pratinjau batch: {e}")
+
+
+@app.post(
+    "/api/v1/rainfall/v2/commit",
+    tags=["Rainfall Input V2"],
+    summary="Atomically commit previewed rainfall batch to MariaDB with audit logging",
+)
+def rainfall_v2_commit(payload: Dict[str, Any]):
+    from backend.rainfall_ingestion_v2 import commit_batch_session
+    try:
+        return commit_batch_session(
+            batch_session_id=payload["batch_session_id"],
+            confirm_conflicts=bool(payload.get("confirm_conflicts", False)),
+            correction_reason=payload.get("correction_reason", ""),
+            operator=payload.get("operator") or "OPERATOR_BMKG",
+        )
+    except (KeyError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gagal menyimpan batch curah hujan: {e}")
+
+
+@app.post(
+    "/api/v1/rainfall/v2/manual/preview",
+    tags=["Rainfall Input V2"],
+    summary="Validate and preview multi-date manual rainfall input for a station",
+)
+def rainfall_v2_manual_preview(payload: Dict[str, Any]):
+    from backend.rainfall_ingestion_v2 import preview_manual_input_v2
+    try:
+        return preview_manual_input_v2(
+            regency_code=payload["regency_code"],
+            station_id=payload["station_id"],
+            rows=payload.get("rows", []),
+        )
+    except (KeyError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gagal memvalidasi input manual: {e}")
+
+
+@app.post(
+    "/api/v1/rainfall/v2/manual/commit",
+    tags=["Rainfall Input V2"],
+    summary="Atomically commit validated multi-date manual rainfall input to MariaDB",
+)
+def rainfall_v2_manual_commit(payload: Dict[str, Any]):
+    from backend.rainfall_ingestion_v2 import commit_manual_input_v2
+    try:
+        return commit_manual_input_v2(
+            regency_code=payload["regency_code"],
+            station_id=payload["station_id"],
+            rows=payload.get("rows", []),
+            confirm_conflicts=bool(payload.get("confirm_conflicts", False)),
+            correction_reason=payload.get("correction_reason", ""),
+            operator=payload.get("operator") or "OPERATOR_BMKG",
+            baseline_fingerprint=payload.get("baseline_fingerprint"),
+        )
+    except (KeyError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gagal menyimpan input manual: {e}")
+
+
+# ==============================================================================
 # PRODUCTION SPA STATIC SERVING (Served only when CEWS_SERVE_FRONTEND=true)
 # ==============================================================================
 if SERVE_FRONTEND:

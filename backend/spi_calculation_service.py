@@ -222,7 +222,7 @@ def execute_spi_generation(
         with conn.cursor() as cur:
             format_strings = ','.join(['%s'] * len(target_sids))
             query = f"""
-                SELECT station_id, observation_date, rainfall_mm
+                SELECT station_id, observation_date, rainfall_mm, obs_status
                 FROM cews_rainfall_daily
                 WHERE station_id IN ({format_strings})
                 ORDER BY station_id, observation_date ASC
@@ -231,12 +231,20 @@ def execute_spi_generation(
             rows = cur.fetchall()
 
     # Group series by station
+    # Standard DSS-PIK SPI rule:
+    # - OBSERVED_ZERO ('-') is valid 0.0 mm
+    # - TTU and MISSING/DAMAGED/VOID ('9999') are NEVER treated as 0 mm (mapped to NaN)
+    non_numeric_statuses = {"TTU", "MISSING", "DAMAGED", "VOID", "AMBIGUOUS"}
     station_series: Dict[str, Dict[str, List[Any]]] = {sid: {"dates": [], "values": []} for sid in target_sids}
     for r in rows:
         sid = r["station_id"].strip().upper()
         if sid in station_series:
             d_str = r["observation_date"].strftime("%Y-%m-%d")
-            v = float(r["rainfall_mm"]) if r["rainfall_mm"] is not None else np.nan
+            obs_st = (r.get("obs_status") or "").strip().upper()
+            if obs_st in non_numeric_statuses or r["rainfall_mm"] is None:
+                v = np.nan
+            else:
+                v = float(r["rainfall_mm"])
             station_series[sid]["dates"].append(d_str)
             station_series[sid]["values"].append(v)
 

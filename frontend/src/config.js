@@ -265,5 +265,14 @@ export const API_ENDPOINTS = {
   },
   SIH3_PUBLICATION_JSON_BY_ID: (publicationId) =>
     `${API_BASE_URL}/api/v1/publications/sih3/${encodeURIComponent(publicationId)}/json`,
+
+  // Rainfall Input Module V2 (Auto Template Detection, Multi-Format & Manual)
+  RAINFALL_V2_REGENCIES: `${API_BASE_URL}/api/v1/rainfall/v2/regencies`,
+  RAINFALL_V2_DETECT: `${API_BASE_URL}/api/v1/rainfall/v2/detect`,
+  RAINFALL_V2_PROFILES: `${API_BASE_URL}/api/v1/rainfall/v2/profiles`,
+  RAINFALL_V2_PREVIEW: `${API_BASE_URL}/api/v1/rainfall/v2/preview`,
+  RAINFALL_V2_COMMIT: `${API_BASE_URL}/api/v1/rainfall/v2/commit`,
+  RAINFALL_V2_MANUAL_PREVIEW: `${API_BASE_URL}/api/v1/rainfall/v2/manual/preview`,
+  RAINFALL_V2_MANUAL_COMMIT: `${API_BASE_URL}/api/v1/rainfall/v2/manual/commit`,
 };
 

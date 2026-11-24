@@ -772,19 +772,21 @@ def export_rainfall_data(
                 cur.execute(obs_sql, tuple(obs_params))
                 obs_rows = cur.fetchall()
 
-    # Organize obs map: (date_str, station_id_lower) -> display_str
+    # Organize obs map: (date_str, station_id_lower) -> standardized DSS-PIK display_str
+    # Standard: OBSERVED_ZERO -> '-', TTU -> 'TTU', MISSING/DAMAGED/VOID -> '9999', positive -> numeric mm
     obs_map: Dict[Tuple[str, str], str] = {}
     for r in obs_rows:
         d_str = r["observation_date"].strftime("%Y-%m-%d")
         sid = str(r["station_id"]).strip().lower()
-        if r.get("original_symbol") == "TTU" or r.get("obs_status") == "TTU":
+        obs_st = (r.get("obs_status") or "").strip().upper()
+        if obs_st == "TTU" or r.get("original_symbol") == "TTU":
             val_str = "TTU"
-        elif r.get("rainfall_mm") is not None:
-            val_str = f"{float(r['rainfall_mm']):.1f}"
-        elif r.get("original_symbol"):
-            val_str = str(r["original_symbol"])
+        elif obs_st in ("MISSING", "DAMAGED", "VOID") or r.get("rainfall_mm") is None:
+            val_str = "9999"
+        elif obs_st == "OBSERVED_ZERO" or float(r["rainfall_mm"]) == 0.0:
+            val_str = "-"
         else:
-            val_str = "X"
+            val_str = f"{float(r['rainfall_mm']):.1f}"
         obs_map[(d_str, sid)] = val_str
 
     # Build Header
@@ -801,7 +803,7 @@ def export_rainfall_data(
         das = 1 if d <= 10 else (2 if d <= 20 else 3)
         row = [d_str, y, m, d, das]
         for sid in target_stations:
-            val = obs_map.get((d_str, str(sid).strip().lower()), "X")
+            val = obs_map.get((d_str, str(sid).strip().lower()), "9999")
             row.append(val)
         rows_data.append(row)
 

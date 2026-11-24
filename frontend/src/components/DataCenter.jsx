@@ -15,6 +15,7 @@ import ProbabilityDataTable from './ProbabilityDataTable';
 import StationInfoModal from './StationInfoModal';
 import DataDownloadModal from './DataDownloadModal';
 import DataIngestionModal from './DataIngestionModal';
+import RainfallInputModal from './RainfallInputModal';
 import SpiGeneratorModal from './SpiGeneratorModal';
 import OperationalDataManager from './OperationalDataManager';
 import ErrorBoundary from './ErrorBoundary';
@@ -24,6 +25,7 @@ export default function DataCenter({ initialSubTab = 'rainfall', activePeriodId 
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [showIngestionModal, setShowIngestionModal] = useState(false);
+  const [showRainfallInputModal, setShowRainfallInputModal] = useState(false);
   const [showGeneratorModal, setShowGeneratorModal] = useState(false);
   const [ingestionCategory, setIngestionCategory] = useState('AUTO_DETECT');
   const [managementInitialTab, setManagementInitialTab] = useState('STORAGE');
@@ -43,6 +45,10 @@ export default function DataCenter({ initialSubTab = 'rainfall', activePeriodId 
   };
 
   const handleOpenIngestion = (category = 'AUTO_DETECT') => {
+    if (category === 'CURAH_HUJAN') {
+      setShowRainfallInputModal(true);
+      return;
+    }
     setIngestionCategory(category);
     setShowIngestionModal(true);
   };
@@ -221,6 +227,19 @@ export default function DataCenter({ initialSubTab = 'rainfall', activePeriodId 
             handleOpenManagement(tab);
           }}
           onIngestionSuccess={(res) => {
+            setRefreshKey((prev) => prev + 1);
+            if (onDataIngestionCommitted) {
+              onDataIngestionCommitted(res);
+            }
+          }}
+        />
+      </ErrorBoundary>
+
+      <ErrorBoundary name="Input Data Curah Hujan">
+        <RainfallInputModal
+          isOpen={showRainfallInputModal}
+          onClose={() => setShowRainfallInputModal(false)}
+          onSuccess={(res) => {
             setRefreshKey((prev) => prev + 1);
             if (onDataIngestionCommitted) {
               onDataIngestionCommitted(res);

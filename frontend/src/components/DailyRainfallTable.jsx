@@ -303,16 +303,16 @@ export default function DailyRainfallTable({ onOpenInfo, onOpenDownload, onOpenI
               <span>Hujan Ringan (&lt; 1.0 mm)</span>
             </div>
             <div className="legend-chip">
-              <span className="sample-cell zero-cell">0.0</span>
-              <span>Hari Kering / Tanpa Hujan</span>
+              <span className="sample-cell zero-cell">-</span>
+              <span>Tidak Ada Hujan (0 mm)</span>
             </div>
             <div className="legend-chip">
               <span className="sample-cell ttu-badge-sample">TTU</span>
-              <span>Hujan Jejak (Trace &lt; 0.5 mm)</span>
+              <span>Hujan Tidak Terukur (TTU)</span>
             </div>
             <div className="legend-chip">
-              <span className="sample-cell missing-cell">-</span>
-              <span>Data Belum Ada / Missing</span>
+              <span className="sample-cell missing-cell">9999</span>
+              <span>Data Tidak Masuk / Kosong / Rusak</span>
             </div>
           </div>
 
@@ -406,27 +406,27 @@ export default function DailyRainfallTable({ onOpenInfo, onOpenDownload, onOpenI
                       const sid = col.station_id;
                       const cellData = row.stations ? row.stations[sid] : null;
 
-                      if (!cellData || cellData.obs_status === 'MISSING' || cellData.rainfall_mm === null) {
+                      if (!cellData || cellData.obs_status === 'MISSING' || cellData.obs_status === 'DAMAGED' || cellData.obs_status === 'VOID' || cellData.rainfall_mm === null) {
                         return (
-                          <td key={sid} className="data-cell cell-muted" title={`${col.harian_name} (${row.date}): Data Tidak Tersedia`}>
-                            <span className="cell-text-missing">-</span>
+                          <td key={sid} className="data-cell cell-muted" title={`${col.harian_name} (${row.date}): Data Tidak Tersedia / Kosong / Alat Rusak (9999)`}>
+                            <span className="cell-text-missing font-mono">9999</span>
                           </td>
                         );
                       }
 
                       if (cellData.obs_status === 'TTU') {
                         return (
-                          <td key={sid} className="data-cell cell-ttu" title={`${col.harian_name} (${row.date}): Hujan Jejak (TTU)`}>
+                          <td key={sid} className="data-cell cell-ttu" title={`${col.harian_name} (${row.date}): Hujan Tidak Terukur (TTU)`}>
                             <span className="cell-badge-ttu">TTU</span>
                           </td>
                         );
                       }
 
                       const rf = cellData.rainfall_mm;
-                      if (rf === 0.0) {
+                      if (cellData.obs_status === 'OBSERVED_ZERO' || rf === 0.0) {
                         return (
-                          <td key={sid} className="data-cell cell-zero" title={`${col.harian_name} (${row.date}): 0.0 mm (Hari Kering)`}>
-                            <span className="cell-text-zero">0.0</span>
+                          <td key={sid} className="data-cell cell-zero" title={`${col.harian_name} (${row.date}): Tidak Ada Hujan (0 mm)`}>
+                            <span className="cell-text-zero font-mono">-</span>
                           </td>
                         );
                       }
