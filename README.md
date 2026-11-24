@@ -148,7 +148,9 @@ docker compose --env-file .env.production exec -T mariadb \
 ---
 
 ## 8. Dokumentasi Terkait
-- Arsitektur Deployment: [`docs/deployment/DSS_PIK_DEPLOYMENT_ARCHITECTURE.md`](docs/deployment/DSS_PIK_DEPLOYMENT_ARCHITECTURE.md)
-- Panduan Konfigurasi Produksi: [`docs/deployment/PRODUCTION_CONFIGURATION_GUIDE.md`](docs/deployment/PRODUCTION_CONFIGURATION_GUIDE.md)
-- Arsitektur Split & CI/CD (Phase 8.4): [`docs/deployment/PHASE_8_4_FINAL_GITHUB_AND_SPLIT_ARCHITECTURE.md`](docs/deployment/PHASE_8_4_FINAL_GITHUB_AND_SPLIT_ARCHITECTURE.md)
-- Hardening Repository (Phase 8.5): [`docs/deployment/PHASE_8_5_GITHUB_HARDENING.md`](docs/deployment/PHASE_8_5_GITHUB_HARDENING.md)
+- **Panduan Induk Development, GitHub & Auto-Deployment**: [`docs/deployment/DSS_PIK_DEVELOPMENT_AND_DEPLOYMENT_GUIDE.md`](docs/deployment/DSS_PIK_DEVELOPMENT_AND_DEPLOYMENT_GUIDE.md)
+- **Implementasi Coolify Auto-Deployment**: [`docs/deployment/COOLIFY_AUTOMATIC_DEPLOYMENT_IMPLEMENTATION.md`](docs/deployment/COOLIFY_AUTOMATIC_DEPLOYMENT_IMPLEMENTATION.md)
+- **Arsitektur Deployment**: [`docs/deployment/DSS_PIK_DEPLOYMENT_ARCHITECTURE.md`](docs/deployment/DSS_PIK_DEPLOYMENT_ARCHITECTURE.md)
+- **Panduan Konfigurasi Produksi**: [`docs/deployment/PRODUCTION_CONFIGURATION_GUIDE.md`](docs/deployment/PRODUCTION_CONFIGURATION_GUIDE.md)
+- **Arsitektur Split & CI/CD (Phase 8.4)**: [`docs/deployment/PHASE_8_4_FINAL_GITHUB_AND_SPLIT_ARCHITECTURE.md`](docs/deployment/PHASE_8_4_FINAL_GITHUB_AND_SPLIT_ARCHITECTURE.md)
+- **Hardening Repository (Phase 8.5)**: [`docs/deployment/PHASE_8_5_GITHUB_HARDENING.md`](docs/deployment/PHASE_8_5_GITHUB_HARDENING.md)
