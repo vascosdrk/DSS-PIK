@@ -274,5 +274,7 @@ export const API_ENDPOINTS = {
   RAINFALL_V2_COMMIT: `${API_BASE_URL}/api/v1/rainfall/v2/commit`,
   RAINFALL_V2_MANUAL_PREVIEW: `${API_BASE_URL}/api/v1/rainfall/v2/manual/preview`,
   RAINFALL_V2_MANUAL_COMMIT: `${API_BASE_URL}/api/v1/rainfall/v2/manual/commit`,
+  RAINFALL_V2_DELETE_PREVIEW: `${API_BASE_URL}/api/v1/rainfall/v2/delete/preview`,
+  RAINFALL_V2_DELETE_COMMIT: `${API_BASE_URL}/api/v1/rainfall/v2/delete/commit`,
 };
 

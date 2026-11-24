@@ -47,7 +47,7 @@ export default function Header({
                 </span>
               </div>
               <p className="header-subtitle">
-                Stasiun Meteorologi Kelas II Raja Haji Fisabilillah-Tanjungpinang
+                Stasiun Meteorologi Kelas II Raja Haji Fisabilillah Tanjungpinang
               </p>
             </div>
           </div>

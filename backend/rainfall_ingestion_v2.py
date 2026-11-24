@@ -242,10 +242,12 @@ SUMMARY_ROW_KEYWORDS = (
 # Built-in aliases per regency to match raw workbook names cleanly to master station_id
 RAW_STATION_ALIASES: Dict[str, Dict[str, str]] = {
     "KARIMUN": {
+        "96089": "21020302A",
         "stamet tbk": "21020302A",
         "stamet raja haji abdullah": "21020302A",
         "raja haji abdullah": "21020302A",
         "stasiun meteorologi raja haji abdullah": "21020302A",
+        "stasiun meteorologi raja haji abdullah tanjung balai karimun": "21020302A",
         "kapling tebing": "21020301A",
         "kantor lurah kapling tebing": "21020301A",
         "bpp sememal": "21020401A",
@@ -291,11 +293,15 @@ RAW_STATION_ALIASES: Dict[str, Dict[str, str]] = {
         "harapan jaya": "21031601A",
         "sabang mawang": "21031101A",
         "pulau tiga sabang mawang": "21031101A",
+        "pulau tiga pulau tiga barat": "21031101A",
+        "pulau tiga barat": "21031101A",
         "sabang barat": "21030401A",
         "hilir": "21030601A",
         "melia": "21030901A",
         "sedanau": "21030501A",
         "sedanau kp balau": "21030501A",
+        "bunguran barat kampung balau": "21030501A",
+        "kampung balau": "21030501A",
         "air payang": "21031001A",
         "batubi": "21032001A",
         "teluk buton": "21030802A",
@@ -1263,7 +1269,7 @@ def parse_raw_karimun(
                     ]
                     if "no. stasiun" in label and val_candidates:
                         raw_code = val_candidates[0]
-                    elif ("nama" in label or "pos" in label or "stasiun" in label) and "no." not in label and val_candidates:
+                    elif ("nama" in label or "pos" in label or "stasiun" in label or "tempat" in label) and "no." not in label and val_candidates:
                         raw_name = val_candidates[0]
 
                 sid, method = match_station_for_regency(
@@ -1664,6 +1670,11 @@ def parse_raw_anambas(
         meta_cells = [str(row[c]).strip() if c < len(row) and row[c] is not None else "" for c in range(6)]
         if not any(meta_cells):
             continue
+        first_cell_low = meta_cells[0].lower()
+        if "keterangan" in first_cell_low or "catatan" in first_cell_low:
+            break  # Stop at legend block at bottom of Anambas sheet
+        if re.fullmatch(r"\(\d+\)", meta_cells[0]):
+            continue  # Skip column-number row e.g. '(1)', '(2)', ...
         if any(_is_summary_text(m) for m in meta_cells if m):
             continue
 
@@ -1915,10 +1926,9 @@ def parse_legacy_via_existing(
         if end_date and obs_d > end_date:
             out_of_range += 1
             continue
-        # Note: Tanjungpinang legacy workbook historically bundles Bintan + Tanjungpinang;
-        # keep all matched stations from the legacy file if regency is TANJUNGPINANG or BINTAN,
-        # otherwise restrict to selected regency if station belongs to it.
-        if regency_code.upper() not in ("TANJUNGPINANG", "BINTAN") and e["station_id"].upper() not in reg_stations:
+        # Strictly enforce selected regency isolation (Bintan and Tanjungpinang share the same
+        # workbook format, so stations must NEVER cross-contaminate between Bintan and Tanjungpinang).
+        if e["station_id"].upper() not in reg_stations:
             continue
         item = dict(e)
         item["source_file"] = filename
@@ -2589,3 +2599,261 @@ def commit_manual_input_v2(
         baseline_fingerprint=baseline_fingerprint,
         regency_code=regency_code.upper(),
     )
+
+
+# ==============================================================================
+# 8. PERIOD-BASED SOFT-DELETE (VOID) WITH PREVIEW, TRANSACTION & AUDIT TRAIL
+# ==============================================================================
+def preview_delete_rainfall_period(
+    regency_code: str,
+    start_date: str,
+    end_date: str,
+    station_ids: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """
+    Read-only preview of active rainfall records that would be soft-deleted (VOID)
+    within a specific regency, date range, and station scope.
+    """
+    rc = regency_code.strip().upper()
+    if rc not in REGENCY_REGISTRY:
+        raise ValueError(f"Wilayah '{regency_code}' tidak valid.")
+
+    try:
+        s_dt = date.fromisoformat(start_date.strip())
+        e_dt = date.fromisoformat(end_date.strip())
+    except ValueError:
+        raise ValueError("Format tanggal tidak valid. Gunakan YYYY-MM-DD.")
+    if s_dt > e_dt:
+        raise ValueError("Tanggal mulai tidak boleh lebih besar dari tanggal akhir.")
+
+    reg_stations = {s["station_id"].upper(): s for s in get_regency_stations(rc)}
+    if station_ids:
+        target_sids = []
+        for sid in station_ids:
+            u = sid.strip().upper()
+            if u not in reg_stations:
+                raise ValueError(f"Stasiun '{u}' bukan bagian dari wilayah {REGENCY_REGISTRY[rc]['label']}.")
+            target_sids.append(u)
+        target_sids = sorted(set(target_sids))
+    else:
+        target_sids = sorted(reg_stations.keys())
+
+    if not target_sids:
+        raise ValueError("Tidak ada stasiun target untuk wilayah terpilih.")
+
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            fmt = ",".join(["%s"] * len(target_sids))
+            cur.execute(
+                f"""
+                SELECT station_id, observation_date, rainfall_mm, obs_status, original_symbol, rainfall_source
+                FROM cews_rainfall_daily
+                WHERE UPPER(station_id) IN ({fmt})
+                  AND observation_date BETWEEN %s AND %s
+                  AND (obs_status IS NULL OR UPPER(obs_status) != 'VOID')
+                ORDER BY observation_date ASC, station_id ASC
+                """,
+                tuple(target_sids) + (s_dt.isoformat(), e_dt.isoformat()),
+            )
+            rows = cur.fetchall()
+
+    station_counts: Dict[str, int] = {}
+    dates_set: Set[str] = set()
+    sample_records = []
+
+    for r in rows:
+        sid = r["station_id"].upper()
+        d_str = r["observation_date"].strftime("%Y-%m-%d")
+        rf = float(r["rainfall_mm"]) if r["rainfall_mm"] is not None else None
+        obs_st = r.get("obs_status") or "OBSERVED_VALID"
+        station_counts[sid] = station_counts.get(sid, 0) + 1
+        dates_set.add(d_str)
+        if len(sample_records) < 200:
+            sample_records.append({
+                "station_id": sid,
+                "station_name": reg_stations.get(sid, {}).get("station_name", sid),
+                "observation_date": d_str,
+                "rainfall_mm": rf,
+                "obs_status": obs_st,
+                "display_value": format_standard_display(rf, obs_st),
+                "rainfall_source": r.get("rainfall_source") or "",
+            })
+
+    affected_stations = [
+        {
+            "station_id": sid,
+            "station_name": reg_stations.get(sid, {}).get("station_name", sid),
+            "records_count": cnt,
+        }
+        for sid, cnt in sorted(station_counts.items())
+    ]
+
+    return {
+        "regency_code": rc,
+        "regency_label": REGENCY_REGISTRY[rc]["label"],
+        "start_date": s_dt.isoformat(),
+        "end_date": e_dt.isoformat(),
+        "scope_mode": "SELECTED_STATIONS" if station_ids else "ALL_REGENCY_STATIONS",
+        "total_records": len(rows),
+        "affected_stations_count": len(affected_stations),
+        "affected_stations": affected_stations,
+        "affected_dates_count": len(dates_set),
+        "affected_dates": sorted(dates_set),
+        "sample_records": sample_records,
+    }
+
+
+def commit_delete_rainfall_period(
+    regency_code: str,
+    start_date: str,
+    end_date: str,
+    reason: str,
+    operator: str = "OPERATOR_BMKG",
+    station_ids: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """
+    Atomically soft-deletes (marks obs_status='VOID', rainfall_mm=NULL) active rainfall records
+    for the specified regency, date range, and station scope.
+    Logs every affected record to cews_rainfall_correction_log and records a batch audit
+    entry in cews_ingestion_history (enabling traceability and recovery).
+    """
+    if not (reason or "").strip():
+        raise ValueError("Alasan penghapusan data wajib diisi.")
+
+    preview = preview_delete_rainfall_period(regency_code, start_date, end_date, station_ids)
+    if preview["total_records"] == 0:
+        raise ValueError("Tidak ada data curah hujan aktif pada cakupan yang dipilih.")
+
+    rc = preview["regency_code"]
+    target_sids = [s["station_id"] for s in preview["affected_stations"]]
+    s_str = preview["start_date"]
+    e_str = preview["end_date"]
+    batch_id = f"VOID_CH_{rc}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:4].upper()}"
+
+    ensure_ingestion_history_table()
+    conn = get_raw_connection()
+    conn.autocommit = False
+
+    audit_items = []
+    voided_count = 0
+    try:
+        with conn.cursor() as cur:
+            fmt = ",".join(["%s"] * len(target_sids))
+            cur.execute(
+                f"""
+                SELECT station_id, observation_date, rainfall_mm, obs_status, rainfall_source
+                FROM cews_rainfall_daily
+                WHERE UPPER(station_id) IN ({fmt})
+                  AND observation_date BETWEEN %s AND %s
+                  AND (obs_status IS NULL OR UPPER(obs_status) != 'VOID')
+                FOR UPDATE
+                """,
+                tuple(target_sids) + (s_str, e_str),
+            )
+            locked_rows = cur.fetchall()
+
+            for r in locked_rows:
+                sid = r["station_id"].upper()
+                d_str = r["observation_date"].strftime("%Y-%m-%d")
+                old_rf = float(r["rainfall_mm"]) if r["rainfall_mm"] is not None else None
+                old_st = r.get("obs_status") or "OBSERVED_VALID"
+
+                cur.execute(
+                    """
+                    INSERT INTO cews_rainfall_correction_log
+                    (station_id, observation_date, old_rainfall_mm, new_rainfall_mm,
+                     old_obs_status, new_obs_status, reason, approved_by, corrected_at)
+                    VALUES (%s, %s, %s, NULL, %s, 'VOID', %s, %s, CURRENT_TIMESTAMP)
+                    """,
+                    (sid, d_str, old_rf, old_st, f"[{batch_id}] {reason.strip()}", operator),
+                )
+                audit_items.append({
+                    "station_id": sid,
+                    "observation_date": d_str,
+                    "old_rainfall_mm": old_rf,
+                    "old_obs_status": old_st,
+                    "rainfall_mm": None,
+                    "obs_status": "VOID",
+                    "change_type": "UPDATED",
+                })
+
+            cur.execute(
+                f"""
+                UPDATE cews_rainfall_daily
+                SET obs_status = 'VOID',
+                    rainfall_mm = NULL,
+                    is_observed = 0,
+                    is_missing = 1,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE UPPER(station_id) IN ({fmt})
+                  AND observation_date BETWEEN %s AND %s
+                  AND (obs_status IS NULL OR UPPER(obs_status) != 'VOID')
+                """,
+                tuple(target_sids) + (s_str, e_str),
+            )
+            voided_count = cur.rowcount
+
+            scope_json = json.dumps({
+                "action": "PERIOD_SOFT_DELETE_VOID",
+                "regency_code": rc,
+                "regency_label": preview["regency_label"],
+                "start_date": s_str,
+                "end_date": e_str,
+                "station_ids": target_sids,
+                "reason": reason.strip(),
+            })
+            cur.execute(
+                """
+                INSERT INTO cews_ingestion_history
+                (batch_id, data_type, file_name, date_range_start, date_range_end, target_period,
+                 total_records, new_records, updated_records, identical_records, rejected_records,
+                 parser_version, approval_scope, status, operator, notes, batch_items_json)
+                VALUES (%s, 'CURAH_HUJAN', %s, %s, %s, %s, %s, 0, %s, 0, 0, %s, %s, 'COMMITTED', %s, %s, %s)
+                """,
+                (
+                    batch_id,
+                    f"DELETE_VOID_{rc}_{s_str}_to_{e_str}",
+                    s_str,
+                    e_str,
+                    json.dumps([f"{s_str}..{e_str}"]),
+                    voided_count,
+                    voided_count,
+                    PARSER_VERSION,
+                    scope_json,
+                    operator,
+                    reason.strip(),
+                    json.dumps(audit_items, default=str),
+                ),
+            )
+        conn.commit()
+    except Exception as exc:
+        conn.rollback()
+        raise RuntimeError(f"Penghapusan data dibatalkan (rollback): {exc}")
+    finally:
+        conn.close()
+
+    # Clear runtime caches so SPI & dashboard reflect VOID immediately
+    for mod_name in ("backend.data_service", "backend.main"):
+        try:
+            if mod_name == "backend.data_service":
+                from backend.data_service import clear_spi_cache
+                clear_spi_cache()
+            else:
+                from backend.main import _SNAPSHOTS_CACHE
+                _SNAPSHOTS_CACHE.clear()
+        except Exception:
+            pass
+
+    return {
+        "success": True,
+        "batch_id": batch_id,
+        "regency_code": rc,
+        "regency_label": preview["regency_label"],
+        "start_date": s_str,
+        "end_date": e_str,
+        "voided_records": voided_count,
+        "affected_stations_count": len(target_sids),
+        "operator": operator,
+        "reason": reason.strip(),
+        "message": f"Berhasil menonaktifkan (VOID) {voided_count} record curah hujan pada {len(target_sids)} stasiun ({s_str} s/d {e_str}).",
+    }

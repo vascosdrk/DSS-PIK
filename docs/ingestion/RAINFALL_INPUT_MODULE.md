@@ -140,3 +140,32 @@ Jalankan test suite lokal (pastikan MariaDB portable lokal aktif di port 3306):
 **Batasan yang diketahui**:
 - Format biner Excel lama `.xls` (BIFF) ditolak dengan pesan jelas karena `openpyxl` hanya membaca `.xlsx`/`.xlsm`; simpan ulang file sebagai `.xlsx`.
 - Empat workbook mentah asli dari daerah belum tersimpan di direktori fixture lokal sehingga pengujian parser mentah saat ini menggunakan fixture sintetis yang mereplikasi spesifikasi struktur aktual.
+
+
+---
+
+## 9. Fitur Hapus Data Curah Hujan Berdasarkan Periode (Soft-Delete `VOID`)
+
+Akses melalui **Pusat Data → Data Curah Hujan → Tombol `Hapus Data`** (`RainfallDeleteModal.jsx`).
+
+### Alur 5 Tahap
+1. **Wilayah**: Pilih 1 dari 7 kabupaten/kota (termasuk **Kabupaten Bintan** dan **Kota Tanjungpinang** yang terpisah secara ketat).
+2. **Periode**: Tentukan tanggal mulai dan tanggal akhir.
+3. **Cakupan Stasiun**: Semua stasiun pada wilayah terpilih, atau satu/beberapa stasiun tertentu.
+4. **Pratinjau Dampak**: Menampilkan wilayah, periode, jumlah stasiun terdampak, total record aktif, dan sampel nilai CH sebelum eksekusi.
+5. **Konfirmasi & Eksekusi Transaksional**: Wajib mengisi alasan penghapusan dan mencentang konfirmasi.
+
+### Keamanan, Audit Trail & Pemulihan
+- **Soft-Delete (`VOID`)**: Record tidak dihapus fisik permanen (`DELETE`); status diubah menjadi `obs_status = 'VOID'`, `rainfall_mm = NULL`, `is_observed = 0`, `is_missing = 1` dalam satu transaksi atomik MariaDB (`FOR UPDATE`, rollback penuh jika gagal).
+- **Dampak pada Tabel CH, Ekspor & SPI**:
+  - Tabel CH Data Center (`/api/v1/rainfall/daily-table`) dan ekspor (`/api/v1/rainfall/download`) mengecualikan record `VOID`.
+  - Perhitungan SPI (`backend/spi_calculation_service.py`) memetakan `VOID`, `TTU`, `MISSING`, dan `DAMAGED` ke `NaN` sehingga tidak pernah dihitung sebagai `0 mm`.
+- **Audit Trail & Pemulihan**:
+  - Setiap record yang di-`VOID` dicatat di `cews_rainfall_correction_log` beserta nilai lama (`old_rainfall_mm`, `old_obs_status`), alasan, operator, dan waktu.
+  - Ringkasan batch dicatat di `cews_ingestion_history` (`batch_id = VOID_CH_...`, lengkap dengan `batch_items_json`) sehingga dapat dipulihkan melalui mekanisme pembatalan batch (`POST /api/v1/ingestion/batch/{batch_id}/cancel`).
+
+### Endpoint API Hapus Data
+| Method | Endpoint | Fungsi |
+|---|---|---|
+| `POST` | `/api/v1/rainfall/v2/delete/preview` | Pratinjau dampak soft-delete berdasarkan wilayah, periode, dan stasiun |
+| `POST` | `/api/v1/rainfall/v2/delete/commit` | Eksekusi atomik soft-delete (`VOID`) + audit log + cache invalidation |

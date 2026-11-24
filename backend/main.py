@@ -1672,12 +1672,13 @@ def get_rainfall_daily_table(
                     )
                     return RainfallDailyTableResponse(meta=meta, columns=station_cols, data=[])
 
-                # 3. Query all station observations for these dates
+                # 3. Query all active (non-VOID) station observations for these dates
                 format_placeholders = ",".join(["%s"] * len(date_list))
                 obs_sql = f"""
                 SELECT station_id, observation_date, rainfall_mm, obs_status, original_symbol
                 FROM cews_rainfall_daily
                 WHERE observation_date IN ({format_placeholders})
+                  AND (obs_status IS NULL OR UPPER(obs_status) != 'VOID')
                 """
                 cur.execute(obs_sql, tuple(date_list))
                 obs_rows = cur.fetchall()
@@ -3710,6 +3711,48 @@ def rainfall_v2_manual_commit(payload: Dict[str, Any]):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Gagal menyimpan input manual: {e}")
+
+
+@app.post(
+    "/api/v1/rainfall/v2/delete/preview",
+    tags=["Rainfall Input V2"],
+    summary="Preview active rainfall records to be soft-deleted (VOID) by regency, date range, and station scope",
+)
+def rainfall_v2_delete_preview(payload: Dict[str, Any]):
+    from backend.rainfall_ingestion_v2 import preview_delete_rainfall_period
+    try:
+        return preview_delete_rainfall_period(
+            regency_code=payload["regency_code"],
+            start_date=payload["start_date"],
+            end_date=payload["end_date"],
+            station_ids=payload.get("station_ids"),
+        )
+    except (KeyError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gagal membuat pratinjau penghapusan data: {e}")
+
+
+@app.post(
+    "/api/v1/rainfall/v2/delete/commit",
+    tags=["Rainfall Input V2"],
+    summary="Atomically soft-delete (VOID) rainfall records by period with full audit trail",
+)
+def rainfall_v2_delete_commit(payload: Dict[str, Any]):
+    from backend.rainfall_ingestion_v2 import commit_delete_rainfall_period
+    try:
+        return commit_delete_rainfall_period(
+            regency_code=payload["regency_code"],
+            start_date=payload["start_date"],
+            end_date=payload["end_date"],
+            reason=payload.get("reason", ""),
+            operator=payload.get("operator") or "OPERATOR_BMKG",
+            station_ids=payload.get("station_ids"),
+        )
+    except (KeyError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gagal menghapus data curah hujan: {e}")
 
 
 # ==============================================================================

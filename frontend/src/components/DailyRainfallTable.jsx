@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 import { API_ENDPOINTS, authFetch } from '../config';
 import RainfallInputModal from './RainfallInputModal';
+import RainfallDeleteModal from './RainfallDeleteModal';
+import { Trash2 } from 'lucide-react';
 
 export default function DailyRainfallTable({ onOpenInfo, onOpenDownload, onOpenIngestion, onOpenManagement }) {
   const [columnsData, setColumnsData] = useState([]);
@@ -26,6 +28,7 @@ export default function DailyRainfallTable({ onOpenInfo, onOpenDownload, onOpenI
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showInputModal, setShowInputModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   // Filters State
   const [yearFilter, setYearFilter] = useState('2026');
@@ -195,6 +198,16 @@ export default function DailyRainfallTable({ onOpenInfo, onOpenDownload, onOpenI
                 <span>Koreksi &amp; Kelola CH</span>
               </button>
             )}
+
+            <button
+              type="button"
+              className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold rounded-lg border border-rose-200 transition"
+              onClick={() => setShowDeleteModal(true)}
+              title="Hapus data curah hujan berdasarkan wilayah dan periode (soft-delete VOID)"
+            >
+              <Trash2 size={13} />
+              <span>Hapus Data</span>
+            </button>
           </div>
         </div>
       </div>
@@ -518,6 +531,15 @@ export default function DailyRainfallTable({ onOpenInfo, onOpenDownload, onOpenI
       <RainfallInputModal
         isOpen={showInputModal}
         onClose={() => setShowInputModal(false)}
+        onSuccess={() => {
+          fetchTableData();
+        }}
+      />
+
+      {/* Period-Based Soft-Delete (VOID) Modal */}
+      <RainfallDeleteModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
         onSuccess={() => {
           fetchTableData();
         }}

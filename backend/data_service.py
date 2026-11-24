@@ -762,6 +762,7 @@ def export_rainfall_data(
                     SELECT station_id, observation_date, rainfall_mm, obs_status, original_symbol
                     FROM cews_rainfall_daily
                     WHERE observation_date IN ({dt_placeholders})
+                      AND (obs_status IS NULL OR UPPER(obs_status) != 'VOID')
                 """
                 obs_params = list(date_list)
                 if sid_filter:

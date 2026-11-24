@@ -426,3 +426,166 @@ def test_manual_input_commit_conflict_and_rollback():
                     cur.execute("DELETE FROM staging_rainfall_import WHERE import_batch_id=%s", (bid,))
                     cur.execute("DELETE FROM cews_ingestion_history WHERE batch_id=%s", (bid,))
             conn.commit()
+
+
+# ==============================================================================
+# 10.7 REAL RAW WORKBOOK VALIDATION (F:\TNJ\paper\template_mentah)
+# ==============================================================================
+REAL_RAW_DIR = Path(r"F:\TNJ\paper\template_mentah")
+
+
+@pytest.mark.parametrize(
+    "regency_code,filename,year,month,expected_kind,expected_stations",
+    [
+        ("KARIMUN", "Karimun.xlsx", 2026, 10, "RAW_KARIMUN", 7),
+        ("LINGGA", "Lingga.xlsx", 2026, 10, "RAW_LINGGA", 8),
+        ("NATUNA", "Natuna.xlsx", 2026, 10, "RAW_NATUNA", 15),
+        ("ANAMBAS", "Anambas.xlsx", 2026, 11, "RAW_ANAMBAS", 3),
+    ],
+)
+def test_real_raw_workbooks_end_to_end(regency_code, filename, year, month, expected_kind, expected_stations):
+    fpath = REAL_RAW_DIR / filename
+    if not fpath.exists():
+        pytest.skip(f"Real raw workbook not present in this environment: {fpath}")
+
+    fbytes = fpath.read_bytes()
+    det = detect_rainfall_template(fbytes, filename, regency_code)
+    assert det["status"] == "DETECTED"
+    assert det["template_kind"] == expected_kind
+
+    sess = create_detect_batch_session(regency_code, [(filename, fbytes)])
+    fid = sess["files"][0]["file_id"]
+    prev = preview_batch_session(
+        sess["batch_session_id"],
+        [{"file_id": fid, "include": True, "year": year, "month": month, "dasarian": None}],
+    )
+    fs = prev["file_summaries"][0]
+    assert fs["status"] == "PARSED"
+    assert fs["recognized_stations_count"] == expected_stations
+    assert fs["unmapped_stations"] == []
+    assert prev["counts"]["unrecognized"] == 0
+    assert fs["records_count"] > 0
+
+
+# ==============================================================================
+# 10.8 BINTAN VS TANJUNGPINANG STRICT STATION ISOLATION
+# ==============================================================================
+def test_bintan_tanjungpinang_strict_isolation():
+    fpath = ROOT / "tambahan/template_data_input/ch/Kota Tanjungpinang.xlsx"
+    if not fpath.exists():
+        pytest.skip(f"Legacy workbook not present: {fpath}")
+    fbytes = fpath.read_bytes()
+
+    bintan_master = {s["station_id"].upper() for s in get_regency_stations("BINTAN")}
+    tpi_master = {s["station_id"].upper() for s in get_regency_stations("TANJUNGPINANG")}
+    assert bintan_master.isdisjoint(tpi_master)
+
+    sess_b = create_detect_batch_session("BINTAN", [(fpath.name, fbytes)])
+    prev_b = preview_batch_session(
+        sess_b["batch_session_id"],
+        [{"file_id": sess_b["files"][0]["file_id"], "include": True, "start_date": "2026-01-01", "end_date": "2026-01-10"}],
+    )
+    b_sids = {r["station_id"].upper() for r in prev_b["preview_rows"]}
+    assert b_sids.issubset(bintan_master)
+
+    sess_t = create_detect_batch_session("TANJUNGPINANG", [(fpath.name, fbytes)])
+    prev_t = preview_batch_session(
+        sess_t["batch_session_id"],
+        [{"file_id": sess_t["files"][0]["file_id"], "include": True, "start_date": "2026-01-01", "end_date": "2026-01-10"}],
+    )
+    t_sids = {r["station_id"].upper() for r in prev_t["preview_rows"]}
+    assert t_sids.issubset(tpi_master)
+    assert b_sids.isdisjoint(t_sids)
+
+
+# ==============================================================================
+# 10.9 PERIOD-BASED SOFT-DELETE (VOID), AUDIT TRAIL & RECOVERY
+# ==============================================================================
+def test_period_soft_delete_void_audit_and_recovery():
+    from backend.rainfall_ingestion_v2 import (
+        commit_delete_rainfall_period,
+        preview_delete_rainfall_period,
+    )
+
+    sid_a = "21050101A"  # Stamet Tarempa (Anambas)
+    sid_b = "21050201A"  # Langir (Anambas)
+    batches = []
+
+    try:
+        # Seed isolated test records on 2099-11-01..03 for 2 Anambas stations
+        r_a = commit_manual_input_v2(
+            "ANAMBAS", sid_a,
+            [
+                {"observation_date": "2099-11-01", "raw_value": "12.5"},
+                {"observation_date": "2099-11-02", "raw_value": "0"},
+                {"observation_date": "2099-11-03", "raw_value": "5.0"},
+            ],
+            operator="PYTEST_SEED",
+        )
+        r_b = commit_manual_input_v2(
+            "ANAMBAS", sid_b,
+            [
+                {"observation_date": "2099-11-01", "raw_value": "8.0"},
+                {"observation_date": "2099-11-02", "raw_value": "TTU"},
+            ],
+            operator="PYTEST_SEED",
+        )
+        batches.extend([r_a["batch_id"], r_b["batch_id"]])
+
+        # 1. Preview delete for single station (sid_a) on 2099-11-01..02
+        p1 = preview_delete_rainfall_period("ANAMBAS", "2099-11-01", "2099-11-02", station_ids=[sid_a])
+        assert p1["total_records"] == 2
+        assert p1["affected_stations_count"] == 1
+
+        # 2. Commit soft-delete VOID for sid_a on 2099-11-01..02
+        d1 = commit_delete_rainfall_period(
+            "ANAMBAS", "2099-11-01", "2099-11-02",
+            reason="Uji soft-delete periode PYTEST", operator="PYTEST_OP", station_ids=[sid_a],
+        )
+        batches.append(d1["batch_id"])
+        assert d1["voided_records"] == 2
+
+        # Verify sid_a 2099-11-01..02 are VOID, while sid_a 2099-11-03 and sid_b are UNTOUCHED
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT station_id, observation_date, rainfall_mm, obs_status FROM cews_rainfall_daily "
+                    "WHERE station_id IN (%s, %s) AND observation_date BETWEEN '2099-11-01' AND '2099-11-03'",
+                    (sid_a, sid_b),
+                )
+                state = {(r["station_id"], r["observation_date"].strftime("%Y-%m-%d")): r for r in cur.fetchall()}
+
+        assert state[(sid_a, "2099-11-01")]["obs_status"] == "VOID"
+        assert state[(sid_a, "2099-11-01")]["rainfall_mm"] is None
+        assert state[(sid_a, "2099-11-03")]["obs_status"] == "OBSERVED_VALID"
+        assert state[(sid_b, "2099-11-01")]["obs_status"] == "OBSERVED_VALID"
+
+        # 3. Verify recovery via cancel_ingestion_batch restores sid_a 2099-11-01 back to 12.5
+        rec = cancel_ingestion_batch(d1["batch_id"], reason="Pemulihan uji PYTEST", operator="PYTEST_OP")
+        assert rec["status"] == "CANCELLED"
+        assert rec["records_reverted"] == 2
+
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT rainfall_mm, obs_status FROM cews_rainfall_daily WHERE station_id=%s AND observation_date='2099-11-01'",
+                    (sid_a,),
+                )
+                restored = cur.fetchone()
+                assert float(restored["rainfall_mm"]) == 12.5
+                assert restored["obs_status"] == "OBSERVED_VALID"
+    finally:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "DELETE FROM cews_rainfall_daily WHERE station_id IN (%s, %s) AND observation_date BETWEEN '2099-11-01' AND '2099-11-03'",
+                    (sid_a, sid_b),
+                )
+                cur.execute(
+                    "DELETE FROM cews_rainfall_correction_log WHERE station_id IN (%s, %s) AND observation_date BETWEEN '2099-11-01' AND '2099-11-03'",
+                    (sid_a, sid_b),
+                )
+                for bid in batches:
+                    cur.execute("DELETE FROM staging_rainfall_import WHERE import_batch_id=%s", (bid,))
+                    cur.execute("DELETE FROM cews_ingestion_history WHERE batch_id=%s", (bid,))
+            conn.commit()
