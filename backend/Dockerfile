@@ -32,7 +32,6 @@ COPY config/ ./config/
 COPY SPEI/src/ ./SPEI/src/
 COPY pipeline/ ./pipeline/
 COPY scripts/ ./scripts/
-COPY database/ ./database/
 COPY pytest.ini ./
 
 RUN mkdir -p /app/data/raw /app/data/reference /app/data/processed /app/data/operational/maps /app/data/historical /app/data/output /app/logs/runtime /app/outputs /app/reports \
