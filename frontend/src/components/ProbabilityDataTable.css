@@ -1,0 +1,729 @@
+/* ==========================================================================
+   Scoped Operational Styles for ProbabilityDataTable (DSS-PIK)
+   Zero impact on global or sibling table components.
+   ========================================================================== */
+
+.prob-v2-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  color: #0f172a;
+}
+
+/* 1. Compact Operational Header */
+.prob-v2-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 20px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.prob-v2-title-group {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 260px;
+  flex: 1 1 380px;
+}
+
+.prob-v2-icon-box {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e40af;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.prob-v2-title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.prob-v2-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+
+.prob-v2-res-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.prob-v2-desc {
+  margin: 4px 0 0;
+  font-size: 0.78rem;
+  color: #475569;
+  line-height: 1.4;
+}
+
+.prob-v2-header-right {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.prob-v2-meta-cards {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.prob-v2-meta-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 6px 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  min-width: 112px;
+}
+
+.prob-v2-meta-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  line-height: 1.2;
+}
+
+.prob-v2-meta-value {
+  margin-top: 2px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #0f172a;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.2;
+}
+
+.prob-v2-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  background: #16a34a;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.prob-v2-status-dot.historic {
+  background: #64748b;
+}
+
+.prob-v2-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.prob-v2-btn-primary,
+.prob-v2-btn-secondary {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.prob-v2-btn-primary {
+  background: #1e3a8a;
+  color: #ffffff;
+  border: 1px solid #1e3a8a;
+}
+
+.prob-v2-btn-primary:hover {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+.prob-v2-btn-secondary {
+  background: #ffffff;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+}
+
+.prob-v2-btn-secondary:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+/* 2. Unified Resolution Switch & Filter Toolbar */
+.prob-v2-controls-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.prob-v2-controls-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.prob-v2-seg-wrap {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.prob-v2-seg-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #475569;
+}
+
+.prob-v2-segmented {
+  display: inline-flex;
+  align-items: center;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 3px;
+  gap: 3px;
+}
+
+.prob-v2-seg-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #475569;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.prob-v2-seg-btn:hover:not(.active) {
+  color: #0f172a;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.prob-v2-seg-btn.active {
+  background: #1e3a8a;
+  color: #ffffff;
+}
+
+.prob-v2-seg-sub {
+  font-size: 0.68rem;
+  font-weight: 500;
+  opacity: 0.85;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+}
+
+.prob-v2-count-summary {
+  font-size: 0.76rem;
+  color: #475569;
+}
+
+.prob-v2-count-summary strong {
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Filter Row */
+.prob-v2-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.prob-v2-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 165px;
+  flex: 0 1 205px;
+}
+
+.prob-v2-field-period {
+  flex: 0 1 230px;
+  min-width: 195px;
+}
+
+.prob-v2-field-search {
+  flex: 1 1 220px;
+  min-width: 200px;
+}
+
+.prob-v2-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #475569;
+  letter-spacing: 0.02em;
+}
+
+.prob-v2-select,
+.prob-v2-input {
+  height: 36px;
+  width: 100%;
+  padding: 0 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 0.78rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.prob-v2-select:focus,
+.prob-v2-input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.prob-v2-select:disabled {
+  background: #f8fafc;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+.prob-v2-search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.prob-v2-search-icon {
+  position: absolute;
+  left: 10px;
+  color: #64748b;
+  pointer-events: none;
+}
+
+.prob-v2-input {
+  padding-left: 32px;
+  padding-right: 28px;
+}
+
+.prob-v2-search-clear {
+  position: absolute;
+  right: 8px;
+  background: transparent;
+  border: none;
+  color: #64748b;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.prob-v2-search-clear:hover {
+  color: #0f172a;
+}
+
+.prob-v2-btn-reset {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 0.78rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.prob-v2-btn-reset:hover {
+  background: #e2e8f0;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+/* 3. Table Card & Single Clean Scroll Container */
+.prob-v2-table-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.prob-v2-scroll {
+  width: 100%;
+  max-height: 62vh;
+  min-height: 320px;
+  overflow: auto;
+  position: relative;
+}
+
+.prob-v2-table {
+  width: 100%;
+  min-width: 920px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+/* Sticky Header (top: 0 — never overlaps data rows) */
+.prob-v2-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: #f1f5f9;
+  color: #1e293b;
+  font-size: 0.71rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 10px 12px;
+  border-bottom: 2px solid #cbd5e1;
+  border-right: 1px solid #e2e8f0;
+  white-space: nowrap;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.prob-v2-table thead th:last-child {
+  border-right: none;
+}
+
+.prob-v2-table thead th.col-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.prob-v2-table thead th.col-center {
+  text-align: center;
+}
+
+.prob-v2-table thead th.col-pdkm {
+  background: #fef9ee;
+  color: #92400e;
+}
+
+.prob-v2-table thead th.col-pdcht {
+  background: #eff6ff;
+  color: #1e3a8a;
+}
+
+.prob-v2-th-sub {
+  display: block;
+  font-size: 0.63rem;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  opacity: 0.8;
+  margin-top: 1px;
+}
+
+/* Body Cells */
+.prob-v2-table tbody td {
+  padding: 9px 12px;
+  border-bottom: 1px solid #f1f5f9;
+  border-right: 1px solid #f1f5f9;
+  background: #ffffff;
+  color: #1e293b;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.prob-v2-table tbody td:last-child {
+  border-right: none;
+}
+
+.prob-v2-table tbody tr:nth-child(even) td {
+  background: #fafcff;
+}
+
+.prob-v2-table tbody tr:hover td {
+  background: #eff6ff;
+}
+
+.prob-v2-table tbody td.col-center {
+  text-align: center;
+}
+
+.prob-v2-table tbody td.col-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Sticky Left Columns (Desktop >= 768px only, zero overlap) */
+@media (min-width: 768px) {
+  .prob-v2-col-no {
+    width: 52px;
+    min-width: 52px;
+    max-width: 52px;
+    position: sticky;
+    left: 0;
+  }
+
+  .prob-v2-col-id {
+    width: 112px;
+    min-width: 112px;
+    max-width: 112px;
+    position: sticky;
+    left: 52px;
+  }
+
+  .prob-v2-col-name {
+    min-width: 210px;
+    position: sticky;
+    left: 164px;
+    box-shadow: 2px 0 6px -2px rgba(15, 23, 42, 0.08);
+  }
+
+  .prob-v2-table thead th.prob-v2-col-no,
+  .prob-v2-table thead th.prob-v2-col-id,
+  .prob-v2-table thead th.prob-v2-col-name {
+    z-index: 30;
+    background: #f1f5f9;
+  }
+
+  .prob-v2-table tbody td.prob-v2-col-no,
+  .prob-v2-table tbody td.prob-v2-col-id,
+  .prob-v2-table tbody td.prob-v2-col-name {
+    z-index: 10;
+  }
+}
+
+/* Numeric Probability Values & Operational Thresholds */
+.prob-v2-val {
+  display: inline-block;
+  min-width: 54px;
+  text-align: right;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #334155;
+}
+
+.prob-v2-val-alert-pdkm {
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-weight: 700;
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+}
+
+.prob-v2-val-alert-pdcht {
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-weight: 700;
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.prob-v2-val-empty {
+  color: #94a3b8;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  user-select: none;
+}
+
+/* Table Footer (always visible outside scroll container) */
+.prob-v2-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 16px;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+  font-size: 0.74rem;
+  color: #475569;
+}
+
+.prob-v2-footer-meta {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.prob-v2-vintage-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: #ecfdf5;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.prob-v2-vintage-tag.historic {
+  background: #f1f5f9;
+  color: #475569;
+  border-color: #cbd5e1;
+}
+
+.prob-v2-legend {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 0.72rem;
+  color: #475569;
+}
+
+.prob-v2-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.prob-v2-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.prob-v2-swatch.pdkm {
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+}
+
+.prob-v2-swatch.pdcht {
+  background: #fee2e2;
+  border: 1px solid #ef4444;
+}
+
+/* Loading & Empty States */
+.prob-v2-loading {
+  padding: 48px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #64748b;
+  font-size: 0.8rem;
+}
+
+.prob-v2-spinner {
+  width: 26px;
+  height: 26px;
+  border: 3px solid #cbd5e1;
+  border-top-color: #1e3a8a;
+  border-radius: 9999px;
+  animation: probV2Spin 0.8s linear infinite;
+}
+
+@keyframes probV2Spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.prob-v2-error {
+  padding: 12px 16px;
+  background: #fef2f2;
+  border-bottom: 1px solid #fecaca;
+  color: #b91c1c;
+  font-size: 0.78rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 1160px) {
+  .prob-v2-header {
+    padding: 14px 16px;
+  }
+
+  .prob-v2-controls-card {
+    padding: 12px 14px;
+  }
+}
+
+@media (max-width: 767px) {
+  .prob-v2-meta-cards,
+  .prob-v2-actions {
+    width: 100%;
+  }
+
+  .prob-v2-meta-card,
+  .prob-v2-btn-primary,
+  .prob-v2-btn-secondary {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .prob-v2-segmented {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .prob-v2-seg-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .prob-v2-field,
+  .prob-v2-field-period,
+  .prob-v2-field-search {
+    flex: 1 1 100%;
+  }
+
+  .prob-v2-btn-reset {
+    width: 100%;
+    justify-content: center;
+  }
+}
