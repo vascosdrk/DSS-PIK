@@ -169,3 +169,25 @@ Akses melalui **Pusat Data → Data Curah Hujan → Tombol `Hapus Data`** (`Rain
 |---|---|---|
 | `POST` | `/api/v1/rainfall/v2/delete/preview` | Pratinjau dampak soft-delete berdasarkan wilayah, periode, dan stasiun |
 | `POST` | `/api/v1/rainfall/v2/delete/commit` | Eksekusi atomik soft-delete (`VOID`) + audit log + cache invalidation |
+
+
+---
+
+## 10. Perbaikan Mapping Template Lama Natuna & Konsolidasi Tab 3
+
+### Akar Masalah 7 Pos Natuna Tidak Cocok di Produksi
+- Di container produksi Docker (`backend/Dockerfile`), folder `docs/` tidak disalin ke image sehingga `docs/DSS_PIK_TEMPLATE_INPUT_SCHEMA.json` tidak tersedia.
+- Akibatnya, `parse_rainfall_excel()` hanya mencocokkan 8 dari 15 sheet `Kabupaten Natuna.xlsx` via exact `station_name` master, sedangkan 7 sheet dengan awalan nama kecamatan/pulau gagal cocok karena belum terdaftar di `known_aliases` di `backend/ingestion_service.py`:
+  1. `02_Bunguran Timur Laut` → `21031501A` (`Tanjung`)
+  2. `05_Pulau Tiga Sabang Mawang` → `21031101A` (`Sabang Mawang`)
+  3. `06_Serasan Hilir` → `21030601A` (`Hilir`)
+  4. `07_Subi Melia` → `21030901A` (`Melia`)
+  5. `08_Midai Sabang Barat` → `21030401A` (`Sabang Barat`)
+  6. `09_Pulau Laut Air Payang` → `21031001A` (`Air Payang`)
+  7. `13_Selemut Cemaga` → `21031802A` (`Selemut`)
+- **Solusi**: Seluruh 15 alias eksplisit Natuna ditambahkan langsung ke `known_aliases` di `backend/ingestion_service.py` dan diuji tanpa file `docs/` (15/15 cocok, 0 unmapped).
+
+### Konsolidasi Pengelolaan Data CH pada Tab 3 (`3. Koreksi & Pembatalan Rekaman`)
+- Tombol terpisah `Hapus Data` pada halaman Data Curah Hujan telah dihapus; tersisa hanya **Input / Pembaruan Data CH** dan **Koreksi & Kelola CH** (langsung mengarah ke Tab 3 dengan filter Curah Hujan aktif).
+- Seluruh operasi **Filter & Tabel Observasi Standar (`-`, `TTU`, `9999`, mm)**, **Koreksi 5 Jenis Nilai**, **Pembatalan Rekaman Terpilih & Periode (VOID)**, **Pemulihan Batch VOID dengan Proteksi Konflik**, dan **Audit Log** terpusat di Tab 3 (`RainfallManagementTab.jsx`).
+- Seluruh endpoint mutasi Tab 3 menggunakan identitas operator dari sesi autentikasi aktual (`request.state.user["username"]`).

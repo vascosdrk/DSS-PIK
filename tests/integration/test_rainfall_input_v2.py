@@ -589,3 +589,117 @@ def test_period_soft_delete_void_audit_and_recovery():
                     cur.execute("DELETE FROM staging_rainfall_import WHERE import_batch_id=%s", (bid,))
                     cur.execute("DELETE FROM cews_ingestion_history WHERE batch_id=%s", (bid,))
             conn.commit()
+
+
+# ==============================================================================
+# 10.10 NATUNA LEGACY REGRESSION (WITHOUT docs/ SCHEMA FILE — DOCKER SIMULATION)
+# ==============================================================================
+def test_natuna_legacy_all_15_sheets_without_docs_schema(monkeypatch):
+    import backend.ingestion_service as ing_mod
+
+    fpath = ROOT / "tambahan/template_data_input/ch/Kabupaten Natuna.xlsx"
+    if not fpath.exists():
+        pytest.skip(f"Legacy Natuna workbook not found: {fpath}")
+
+    # Simulate production Docker container where docs/DSS_PIK_TEMPLATE_INPUT_SCHEMA.json is absent
+    monkeypatch.setattr(ing_mod, "get_curah_hujan_sheet_mapping", lambda: {})
+
+    fbytes = fpath.read_bytes()
+    det = detect_rainfall_template(fbytes, fpath.name, "NATUNA")
+    assert det["status"] == "DETECTED"
+    assert det["template_kind"] == "LEGACY_MULTI_SHEET"
+
+    sess = create_detect_batch_session("NATUNA", [(fpath.name, fbytes)])
+    fid = sess["files"][0]["file_id"]
+    prev = preview_batch_session(
+        sess["batch_session_id"],
+        [{"file_id": fid, "include": True, "start_date": "2026-01-01", "end_date": "2026-01-20"}],
+    )
+    fs = prev["file_summaries"][0]
+    assert fs["status"] == "PARSED"
+    assert fs["unmapped_stations"] == []
+    assert fs["recognized_stations_count"] == 15
+
+
+# ==============================================================================
+# 10.11 TAB 3 STANDARDIZED 5-STATE CORRECTION, SELECTED VOID & CONFLICT RECOVERY
+# ==============================================================================
+def test_tab3_standardized_correction_selected_void_and_conflict_recovery():
+    from backend.rainfall_ingestion_v2 import (
+        correct_rainfall_record_v2,
+        query_rainfall_records_v2,
+        recover_void_batch_v2,
+        void_selected_rainfall_records,
+    )
+
+    sid = "21030701A"  # Stamet Ranai Natuna
+    batches = []
+    try:
+        seed = commit_manual_input_v2(
+            "NATUNA", sid,
+            [
+                {"observation_date": "2099-12-01", "raw_value": "10.0"},
+                {"observation_date": "2099-12-02", "raw_value": "20.0"},
+            ],
+            operator="klimatkepri",
+        )
+        batches.append(seed["batch_id"])
+
+        # 1. Standardized 5-state corrections
+        c1 = correct_rainfall_record_v2(sid, "2099-12-01", "OBSERVED_ZERO", None, "Uji zero", "klimatkepri")
+        assert c1["new_display"] == "-" and c1["new_obs_status"] == "OBSERVED_ZERO"
+
+        c2 = correct_rainfall_record_v2(sid, "2099-12-01", "TTU", None, "Uji TTU", "klimatkepri")
+        assert c2["new_display"] == "TTU" and c2["new_obs_status"] == "TTU"
+
+        c3 = correct_rainfall_record_v2(sid, "2099-12-01", "MISSING", None, "Uji missing", "klimatkepri")
+        assert c3["new_display"] == "9999" and c3["new_obs_status"] == "MISSING"
+
+        c4 = correct_rainfall_record_v2(sid, "2099-12-01", "DAMAGED", None, "Uji rusak", "klimatkepri")
+        assert c4["new_display"] == "9999" and c4["new_obs_status"] == "DAMAGED"
+
+        c5 = correct_rainfall_record_v2(sid, "2099-12-01", "OBSERVED_VALID", 14.5, "Uji valid", "klimatkepri")
+        assert c5["new_display"] == "14.5" and c5["new_obs_status"] == "OBSERVED_VALID"
+
+        # 2. Query Tab 3 records with human labels & standardized display
+        q = query_rainfall_records_v2(regency_code="NATUNA", station_id=sid, start_date="2099-12-01", end_date="2099-12-02")
+        assert q["total"] == 2
+        assert q["items"][0]["status_label"] == "Hujan Terukur"
+
+        # 3. Void selected 2 records
+        v = void_selected_rainfall_records(
+            [
+                {"station_id": sid, "observation_date": "2099-12-01"},
+                {"station_id": sid, "observation_date": "2099-12-02"},
+            ],
+            reason="Uji void terpilih",
+            operator="klimatkepri",
+        )
+        batches.append(v["batch_id"])
+        assert v["voided_records"] == 2
+
+        # 4. Simulate post-VOID correction on 2099-12-02 -> recovery must skip 2099-12-02 (conflict) & restore 2099-12-01!
+        correct_rainfall_record_v2(sid, "2099-12-02", "OBSERVED_VALID", 33.0, "Input ulang pasca VOID", "klimatkepri")
+        rec = recover_void_batch_v2(v["batch_id"], reason="Pemulihan uji konflik", operator="klimatkepri")
+        assert rec["restored_records"] == 1
+        assert rec["conflict_skipped"] == 1
+
+        q_after = query_rainfall_records_v2(regency_code="NATUNA", station_id=sid, start_date="2099-12-01", end_date="2099-12-02")
+        by_d = {r["observation_date"]: r for r in q_after["items"]}
+        assert by_d["2099-12-01"]["display_value"] == "14.5"
+        assert by_d["2099-12-02"]["display_value"] == "33.0"  # Preserved post-VOID edit!
+    finally:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "DELETE FROM cews_rainfall_daily WHERE station_id=%s AND observation_date BETWEEN '2099-12-01' AND '2099-12-02'",
+                    (sid,),
+                )
+                cur.execute(
+                    "DELETE FROM cews_rainfall_correction_log WHERE station_id=%s AND observation_date BETWEEN '2099-12-01' AND '2099-12-02'",
+                    (sid,),
+                )
+                for bid in batches:
+                    cur.execute("DELETE FROM staging_rainfall_import WHERE import_batch_id=%s", (bid,))
+                    cur.execute("DELETE FROM cews_ingestion_history WHERE batch_id=%s", (bid,))
+            conn.commit()

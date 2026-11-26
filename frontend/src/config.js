@@ -276,5 +276,17 @@ export const API_ENDPOINTS = {
   RAINFALL_V2_MANUAL_COMMIT: `${API_BASE_URL}/api/v1/rainfall/v2/manual/commit`,
   RAINFALL_V2_DELETE_PREVIEW: `${API_BASE_URL}/api/v1/rainfall/v2/delete/preview`,
   RAINFALL_V2_DELETE_COMMIT: `${API_BASE_URL}/api/v1/rainfall/v2/delete/commit`,
+  RAINFALL_V2_RECORDS: (params = {}) => {
+    const q = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') q.append(k, v);
+    });
+    const qs = q.toString();
+    return `${API_BASE_URL}/api/v1/rainfall/v2/records${qs ? `?${qs}` : ''}`;
+  },
+  RAINFALL_V2_RECORD_CORRECT: `${API_BASE_URL}/api/v1/rainfall/v2/records/correct`,
+  RAINFALL_V2_RECORDS_VOID_SELECTED: `${API_BASE_URL}/api/v1/rainfall/v2/records/void-selected`,
+  RAINFALL_V2_VOID_BATCH_RECOVER: (batchId) =>
+    `${API_BASE_URL}/api/v1/rainfall/v2/void-batches/${encodeURIComponent(batchId)}/recover`,
 };
 

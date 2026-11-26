@@ -683,6 +683,22 @@ def parse_rainfall_excel(
                     "sebung pereh": "21011004A",
                     "galang batang": "21010403A",
                     "ria bintan lagoi": "21010702A",
+                    # Natuna legacy 15-sheet explicit verified aliases (independent of docs/ schema file in Docker)
+                    "stamet ranai natuna": "21030701A",
+                    "padang meliso": "21031801A",
+                    "bunguran timur laut": "21031501A",
+                    "bunguran utara kelarik": "21030801A",
+                    "bunguran tengah harapan jaya": "21031601A",
+                    "pulau tiga sabang mawang": "21031101A",
+                    "serasan hilir": "21030601A",
+                    "subi melia": "21030901A",
+                    "midai sabang barat": "21030401A",
+                    "pulau laut air payang": "21031001A",
+                    "sedanau kp balau": "21030501A",
+                    "batubi": "21032001A",
+                    "mekar jaya": "21030502A",
+                    "selemut cemaga": "21031802A",
+                    "teluk buton": "21030802A",
                 }
                 for alias_key, sid in known_aliases.items():
                     if alias_key in c_low or alias_key in s_low:

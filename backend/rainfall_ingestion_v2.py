@@ -2857,3 +2857,459 @@ def commit_delete_rainfall_period(
         "reason": reason.strip(),
         "message": f"Berhasil menonaktifkan (VOID) {voided_count} record curah hujan pada {len(target_sids)} stasiun ({s_str} s/d {e_str}).",
     }
+
+
+# ==============================================================================
+# 9. TAB 3 OPERATIONAL MANAGEMENT: QUERY, STANDARDIZED CORRECT, VOID & RECOVERY
+# ==============================================================================
+HUMAN_STATUS_LABELS: Dict[str, str] = {
+    "OBSERVED_VALID": "Hujan Terukur",
+    "OBSERVED_ZERO": "Tidak Ada Hujan",
+    "TTU": "Hujan Tidak Terukur (TTU)",
+    "MISSING": "Data Tidak Masuk",
+    "DAMAGED": "Alat Rusak",
+    "CORRECTED": "Terkoreksi",
+    "VOID": "Dibatalkan (VOID)",
+}
+
+
+def _human_status_label(obs_status: Optional[str], rainfall_mm: Optional[float]) -> str:
+    st = (obs_status or "").strip().upper()
+    if st in HUMAN_STATUS_LABELS:
+        if st == "CORRECTED" and rainfall_mm == 0.0:
+            return "Tidak Ada Hujan (Terkoreksi)"
+        return HUMAN_STATUS_LABELS[st]
+    if rainfall_mm is None:
+        return "Data Tidak Masuk"
+    if float(rainfall_mm) == 0.0:
+        return "Tidak Ada Hujan"
+    return "Hujan Terukur"
+
+
+def query_rainfall_records_v2(
+    regency_code: Optional[str] = None,
+    station_id: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    obs_status: Optional[str] = None,
+    source: Optional[str] = None,
+    include_void: bool = False,
+    limit: int = 100,
+    offset: int = 0,
+) -> Dict[str, Any]:
+    """Filterable query for Tab 3 Rainfall Data Management Center."""
+    master = get_master_station_lookup()
+    where_parts = []
+    params: List[Any] = []
+
+    if not include_void:
+        where_parts.append("(obs_status IS NULL OR UPPER(obs_status) != 'VOID')")
+
+    if regency_code and regency_code.strip().upper() in REGENCY_REGISTRY:
+        reg_sids = [s["station_id"].upper() for s in get_regency_stations(regency_code)]
+        if reg_sids:
+            fmt = ",".join(["%s"] * len(reg_sids))
+            where_parts.append(f"UPPER(station_id) IN ({fmt})")
+            params.extend(reg_sids)
+
+    if station_id and station_id.strip():
+        where_parts.append("UPPER(station_id) = %s")
+        params.append(station_id.strip().upper())
+
+    if start_date and start_date.strip():
+        where_parts.append("observation_date >= %s")
+        params.append(start_date.strip())
+
+    if end_date and end_date.strip():
+        where_parts.append("observation_date <= %s")
+        params.append(end_date.strip())
+
+    if obs_status and obs_status.strip().upper() not in ("", "ALL"):
+        where_parts.append("UPPER(obs_status) = %s")
+        params.append(obs_status.strip().upper())
+
+    if source and source.strip():
+        where_parts.append("UPPER(COALESCE(rainfall_source, '')) LIKE %s")
+        params.append(f"%{source.strip().upper()}%")
+
+    where_sql = ("WHERE " + " AND ".join(where_parts)) if where_parts else ""
+
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(f"SELECT COUNT(*) AS total FROM cews_rainfall_daily {where_sql}", tuple(params))
+            total = int(cur.fetchone()["total"])
+
+            cur.execute(
+                f"""
+                SELECT station_id, observation_date, rainfall_mm, obs_status, original_symbol, rainfall_source, updated_at
+                FROM cews_rainfall_daily
+                {where_sql}
+                ORDER BY observation_date DESC, station_id ASC
+                LIMIT %s OFFSET %s
+                """,
+                tuple(params) + (limit, offset),
+            )
+            rows = cur.fetchall()
+
+    items = []
+    for r in rows:
+        sid = r["station_id"].upper()
+        info = master.get(sid, {})
+        rf = float(r["rainfall_mm"]) if r["rainfall_mm"] is not None else None
+        st = (r.get("obs_status") or "OBSERVED_VALID").upper()
+        items.append({
+            "station_id": sid,
+            "station_name": info.get("station_name", sid),
+            "kabupaten": info.get("kabupaten", ""),
+            "observation_date": r["observation_date"].strftime("%Y-%m-%d"),
+            "rainfall_mm": rf,
+            "obs_status": st,
+            "status_label": _human_status_label(st, rf),
+            "display_value": format_standard_display(rf, st),
+            "rainfall_source": r.get("rainfall_source") or "DATABASE",
+            "updated_at": str(r.get("updated_at") or ""),
+        })
+
+    return {"total": total, "limit": limit, "offset": offset, "items": items}
+
+
+def correct_rainfall_record_v2(
+    station_id: str,
+    observation_date: str,
+    value_type: str,
+    rainfall_mm: Optional[float],
+    reason: str,
+    operator: str,
+) -> Dict[str, Any]:
+    """
+    Standardized single-record correction supporting all 5 meteorological states:
+      - OBSERVED_VALID (numeric mm > 0)
+      - OBSERVED_ZERO  (0.0 mm, display '-')
+      - TTU            (0.0 mm, obs_status='TTU', display 'TTU')
+      - MISSING        (NULL,   obs_status='MISSING', display '9999')
+      - DAMAGED        (NULL,   obs_status='DAMAGED', display '9999')
+    """
+    if not (reason or "").strip():
+        raise ValueError("Alasan koreksi wajib diisi.")
+
+    sid = station_id.strip().upper()
+    d_str = observation_date.strip()
+    date.fromisoformat(d_str)  # validate YYYY-MM-DD
+
+    vt = value_type.strip().upper()
+    if vt == "OBSERVED_VALID":
+        if rainfall_mm is None or float(rainfall_mm) <= 0:
+            raise ValueError("Nilai hujan terukur harus berupa angka positif (> 0 mm).")
+        new_rf: Optional[float] = round(float(rainfall_mm), 2)
+        new_st = "OBSERVED_VALID"
+        orig_sym = str(new_rf)
+        is_obs, is_mis, data_qual = 1, 0, "OBSERVED"
+    elif vt == "OBSERVED_ZERO":
+        new_rf, new_st, orig_sym = 0.0, "OBSERVED_ZERO", "-"
+        is_obs, is_mis, data_qual = 1, 0, "OBSERVED"
+    elif vt == "TTU":
+        new_rf, new_st, orig_sym = 0.0, "TTU", "TTU"
+        is_obs, is_mis, data_qual = 1, 0, "OBSERVED"
+    elif vt == "MISSING":
+        new_rf, new_st, orig_sym = None, "MISSING", "9999"
+        is_obs, is_mis, data_qual = 0, 1, "MISSING"
+    elif vt == "DAMAGED":
+        new_rf, new_st, orig_sym = None, "DAMAGED", "9999"
+        is_obs, is_mis, data_qual = 0, 1, "DAMAGED"
+    else:
+        raise ValueError(f"Jenis nilai koreksi '{value_type}' tidak valid.")
+
+    conn = get_raw_connection()
+    conn.autocommit = False
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT station_id, observation_date, rainfall_mm, obs_status
+                FROM cews_rainfall_daily
+                WHERE UPPER(station_id) = %s AND observation_date = %s
+                FOR UPDATE
+                """,
+                (sid, d_str),
+            )
+            existing = cur.fetchone()
+            if not existing:
+                raise ValueError(f"Rekaman pos {sid} tanggal {d_str} tidak ditemukan.")
+
+            old_rf = float(existing["rainfall_mm"]) if existing["rainfall_mm"] is not None else None
+            old_st = existing.get("obs_status") or "OBSERVED_VALID"
+
+            cur.execute(
+                """
+                UPDATE cews_rainfall_daily
+                SET rainfall_mm = %s,
+                    obs_status = %s,
+                    original_symbol = %s,
+                    data_quality = %s,
+                    is_observed = %s,
+                    is_missing = %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE UPPER(station_id) = %s AND observation_date = %s
+                """,
+                (new_rf, new_st, orig_sym, data_qual, is_obs, is_mis, sid, d_str),
+            )
+            cur.execute(
+                """
+                INSERT INTO cews_rainfall_correction_log
+                (station_id, observation_date, old_rainfall_mm, new_rainfall_mm,
+                 old_obs_status, new_obs_status, reason, approved_by, corrected_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                """,
+                (sid, d_str, old_rf, new_rf, old_st, new_st, reason.strip(), operator),
+            )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    for mod_name in ("backend.data_service", "backend.main"):
+        try:
+            if mod_name == "backend.data_service":
+                from backend.data_service import clear_spi_cache
+                clear_spi_cache()
+            else:
+                from backend.main import _SNAPSHOTS_CACHE
+                _SNAPSHOTS_CACHE.clear()
+        except Exception:
+            pass
+
+    return {
+        "success": True,
+        "station_id": sid,
+        "observation_date": d_str,
+        "old_display": format_standard_display(old_rf, old_st),
+        "new_display": format_standard_display(new_rf, new_st),
+        "old_obs_status": old_st,
+        "new_obs_status": new_st,
+        "operator": operator,
+        "reason": reason.strip(),
+        "message": f"Rekaman {sid} ({d_str}) dikoreksi menjadi {format_standard_display(new_rf, new_st)}.",
+    }
+
+
+def void_selected_rainfall_records(
+    records: List[Dict[str, str]],
+    reason: str,
+    operator: str,
+) -> Dict[str, Any]:
+    """Atomically soft-deletes (VOID) one or more explicitly selected rainfall records."""
+    if not (reason or "").strip():
+        raise ValueError("Alasan pembatalan wajib diisi.")
+    if not records:
+        raise ValueError("Pilih minimal satu rekaman untuk dibatalkan.")
+
+    pairs = sorted({(r["station_id"].strip().upper(), r["observation_date"].strip()) for r in records})
+    batch_id = f"VOID_CH_SEL_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:4].upper()}"
+
+    ensure_ingestion_history_table()
+    conn = get_raw_connection()
+    conn.autocommit = False
+    audit_items = []
+    dates_affected = []
+
+    try:
+        with conn.cursor() as cur:
+            for sid, d_str in pairs:
+                cur.execute(
+                    """
+                    SELECT station_id, observation_date, rainfall_mm, obs_status
+                    FROM cews_rainfall_daily
+                    WHERE UPPER(station_id) = %s AND observation_date = %s
+                      AND (obs_status IS NULL OR UPPER(obs_status) != 'VOID')
+                    FOR UPDATE
+                    """,
+                    (sid, d_str),
+                )
+                row = cur.fetchone()
+                if not row:
+                    continue
+                old_rf = float(row["rainfall_mm"]) if row["rainfall_mm"] is not None else None
+                old_st = row.get("obs_status") or "OBSERVED_VALID"
+
+                cur.execute(
+                    """
+                    UPDATE cews_rainfall_daily
+                    SET obs_status = 'VOID', rainfall_mm = NULL, is_observed = 0, is_missing = 1, updated_at = CURRENT_TIMESTAMP
+                    WHERE UPPER(station_id) = %s AND observation_date = %s
+                    """,
+                    (sid, d_str),
+                )
+                cur.execute(
+                    """
+                    INSERT INTO cews_rainfall_correction_log
+                    (station_id, observation_date, old_rainfall_mm, new_rainfall_mm,
+                     old_obs_status, new_obs_status, reason, approved_by, corrected_at)
+                    VALUES (%s, %s, %s, NULL, %s, 'VOID', %s, %s, CURRENT_TIMESTAMP)
+                    """,
+                    (sid, d_str, old_rf, old_st, f"[{batch_id}] {reason.strip()}", operator),
+                )
+                audit_items.append({
+                    "station_id": sid,
+                    "observation_date": d_str,
+                    "old_rainfall_mm": old_rf,
+                    "old_obs_status": old_st,
+                    "rainfall_mm": None,
+                    "obs_status": "VOID",
+                    "change_type": "UPDATED",
+                })
+                dates_affected.append(d_str)
+
+            if not audit_items:
+                raise ValueError("Tidak ada rekaman aktif yang cocok untuk dibatalkan.")
+
+            scope_json = json.dumps({
+                "action": "SELECTED_SOFT_DELETE_VOID",
+                "count": len(audit_items),
+                "reason": reason.strip(),
+            })
+            cur.execute(
+                """
+                INSERT INTO cews_ingestion_history
+                (batch_id, data_type, file_name, date_range_start, date_range_end, target_period,
+                 total_records, new_records, updated_records, identical_records, rejected_records,
+                 parser_version, approval_scope, status, operator, notes, batch_items_json)
+                VALUES (%s, 'CURAH_HUJAN', %s, %s, %s, %s, %s, 0, %s, 0, 0, %s, %s, 'COMMITTED', %s, %s, %s)
+                """,
+                (
+                    batch_id,
+                    f"DELETE_VOID_SELECTED_{len(audit_items)}_RECORDS",
+                    min(dates_affected),
+                    max(dates_affected),
+                    json.dumps([f"{min(dates_affected)}..{max(dates_affected)}"]),
+                    len(audit_items),
+                    len(audit_items),
+                    PARSER_VERSION,
+                    scope_json,
+                    operator,
+                    reason.strip(),
+                    json.dumps(audit_items, default=str),
+                ),
+            )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    return {
+        "success": True,
+        "batch_id": batch_id,
+        "voided_records": len(audit_items),
+        "operator": operator,
+        "message": f"Berhasil membatalkan (VOID) {len(audit_items)} rekaman terpilih.",
+    }
+
+
+def recover_void_batch_v2(
+    batch_id: str,
+    reason: str,
+    operator: str,
+) -> Dict[str, Any]:
+    """
+    Safely recovers records from a VOID batch with conflict protection:
+    - Only restores records that are STILL in VOID status.
+    - If a record was modified/corrected after the VOID, skips it and reports conflict count.
+    """
+    if not (reason or "").strip():
+        raise ValueError("Alasan pemulihan batch wajib diisi.")
+
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM cews_ingestion_history WHERE batch_id = %s", (batch_id,))
+            batch = cur.fetchone()
+    if not batch:
+        raise ValueError(f"Batch '{batch_id}' tidak ditemukan.")
+    if batch.get("status") == "CANCELLED":
+        raise ValueError(f"Batch '{batch_id}' sudah dipulihkan/dibatalkan sebelumnya.")
+
+    items = json.loads(batch.get("batch_items_json") or "[]")
+    if not items:
+        raise ValueError("Batch ini tidak memiliki detail rekaman untuk dipulihkan.")
+
+    conn = get_raw_connection()
+    conn.autocommit = False
+    restored_cnt = 0
+    conflict_skipped = 0
+    conflicts = []
+
+    try:
+        with conn.cursor() as cur:
+            for item in items:
+                sid = item["station_id"].upper()
+                d_str = item["observation_date"]
+                old_rf = item.get("old_rainfall_mm")
+                old_st = item.get("old_obs_status") or "OBSERVED_VALID"
+
+                cur.execute(
+                    """
+                    SELECT rainfall_mm, obs_status FROM cews_rainfall_daily
+                    WHERE UPPER(station_id) = %s AND observation_date = %s
+                    FOR UPDATE
+                    """,
+                    (sid, d_str),
+                )
+                curr = cur.fetchone()
+                if not curr:
+                    conflict_skipped += 1
+                    continue
+
+                curr_st = (curr.get("obs_status") or "").upper()
+                if curr_st != "VOID":
+                    # Conflict check: record was already re-imported or corrected after VOID!
+                    conflict_skipped += 1
+                    conflicts.append({"station_id": sid, "observation_date": d_str, "current_status": curr_st})
+                    continue
+
+                is_obs = 0 if old_st in ("MISSING", "DAMAGED") else 1
+                is_mis = 1 if old_st in ("MISSING", "DAMAGED") else 0
+                cur.execute(
+                    """
+                    UPDATE cews_rainfall_daily
+                    SET rainfall_mm = %s, obs_status = %s, is_observed = %s, is_missing = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE UPPER(station_id) = %s AND observation_date = %s
+                    """,
+                    (old_rf, old_st, is_obs, is_mis, sid, d_str),
+                )
+                cur.execute(
+                    """
+                    INSERT INTO cews_rainfall_correction_log
+                    (station_id, observation_date, old_rainfall_mm, new_rainfall_mm,
+                     old_obs_status, new_obs_status, reason, approved_by, corrected_at)
+                    VALUES (%s, %s, NULL, %s, 'VOID', %s, %s, %s, CURRENT_TIMESTAMP)
+                    """,
+                    (sid, d_str, old_rf, old_st, f"Pemulihan batch {batch_id}: {reason.strip()}", operator),
+                )
+                restored_cnt += 1
+
+            cur.execute(
+                """
+                UPDATE cews_ingestion_history
+                SET status = 'CANCELLED', cancellation_reason = %s, cancelled_by = %s, cancelled_at = CURRENT_TIMESTAMP
+                WHERE batch_id = %s
+                """,
+                (f"RECOVERED: {reason.strip()}", operator, batch_id),
+            )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    return {
+        "success": True,
+        "batch_id": batch_id,
+        "restored_records": restored_cnt,
+        "conflict_skipped": conflict_skipped,
+        "conflicts": conflicts[:20],
+        "operator": operator,
+        "message": f"Pemulihan selesai: {restored_cnt} rekaman diaktifkan kembali, {conflict_skipped} dilewati karena konflik perubahan baru.",
+    }

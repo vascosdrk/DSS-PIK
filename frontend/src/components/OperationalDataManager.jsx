@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { API_ENDPOINTS, authFetch } from '../config';
 import CanonicalStorageStatusCard from './CanonicalStorageStatusCard';
+import RainfallManagementTab from './RainfallManagementTab';
 
 /**
  * OperationalDataManager
@@ -45,6 +46,14 @@ export default function OperationalDataManager({ initialTab = 'STORAGE', initial
   // Active Tab: 'STORAGE' | 'BATCHES' | 'CORRECTIONS' | 'VINTAGES'
   const [managerTab, setManagerTab] = useState(initialTab);
   const [correctionDatasetFilter, setCorrectionDatasetFilter] = useState(initialCorrectionDataset || 'ALL');
+
+  useEffect(() => {
+    if (initialTab) setManagerTab(initialTab);
+  }, [initialTab]);
+
+  useEffect(() => {
+    if (initialCorrectionDataset) setCorrectionDatasetFilter(initialCorrectionDataset);
+  }, [initialCorrectionDataset]);
 
   // 1. KPI Operational Summary State
   const [summary, setSummary] = useState(null);
@@ -904,161 +913,18 @@ export default function OperationalDataManager({ initialTab = 'STORAGE', initial
               </div>
             </div>
 
+            {/* PUSAT PENGELOLAAN CURAH HUJAN TERPADU (FILTER, TABEL, KOREKSI 5-STATUS, VOID TERPILIH/PERIODE, RECOVERY) */}
+            {(correctionDatasetFilter === 'ALL' || correctionDatasetFilter === 'CURAH_HUJAN') && (
+              <RainfallManagementTab
+                onDataChanged={() => {
+                  fetchCorrectionLogs();
+                  fetchSummary();
+                  fetchLatestStatus();
+                }}
+              />
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              {/* SUB-FORM 1: KOREKSI CURAH HUJAN HARIAN */}
-              {(correctionDatasetFilter === 'ALL' || correctionDatasetFilter === 'CURAH_HUJAN') && (
-              <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
-                <div className="flex items-center space-x-2 mb-3 pb-2 border-b border-slate-100">
-                  <div className="p-1.5 bg-sky-100 rounded text-sky-800">
-                    <CloudRain size={16} />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-800">1. Koreksi Rekor Curah Hujan Harian</h4>
-                    <p className="text-[11px] text-slate-500">Perbarui nilai observasi curah hujan salah input (MariaDB)</p>
-                  </div>
-                </div>
-
-                <form onSubmit={handleRecordCorrection} className="space-y-3 text-xs">
-                  <div>
-                    <label className="block text-slate-600 font-medium mb-1">Pos Pengamatan:</label>
-                    <select
-                      value={corrStationId}
-                      onChange={(e) => setCorrStationId(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 font-mono text-xs focus:bg-white"
-                    >
-                      {masterStations.length > 0 ? (
-                        masterStations.map((st) => (
-                          <option key={st.station_id} value={st.station_id}>
-                            {st.station_name} ({st.station_id}) - {st.kabupaten}
-                          </option>
-                        ))
-                      ) : (
-                        <option value="21720201A">Stamet Raja Haji Fisabilillah (21720201A)</option>
-                      )}
-                    </select>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-slate-600 font-medium mb-1">Tanggal Observasi:</label>
-                      <input
-                        type="date"
-                        value={corrDate}
-                        onChange={(e) => setCorrDate(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 font-mono text-xs"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-600 font-medium mb-1">Nilai Baru (mm):</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        min="0"
-                        placeholder="Contoh: 12.5"
-                        value={corrNewRainfall}
-                        onChange={(e) => setCorrNewRainfall(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 font-mono text-xs"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-600 font-medium mb-1">Alasan Koreksi (Audit Trail):</label>
-                    <input
-                      type="text"
-                      placeholder="Contoh: Verifikasi ulang data penangkar manual"
-                      value={corrReason}
-                      onChange={(e) => setCorrReason(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 text-xs"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between pt-1">
-                    <span className="text-[11px] text-slate-400">
-                      Operator: <span className="font-semibold text-slate-600">{corrOperator}</span>
-                    </span>
-                    <button
-                      type="submit"
-                      disabled={corrLoading}
-                      className="px-3 py-1.5 bg-sky-700 hover:bg-sky-800 text-white rounded text-xs font-semibold transition disabled:opacity-50"
-                    >
-                      {corrLoading ? 'Menyimpan...' : 'Simpan Koreksi CH'}
-                    </button>
-                  </div>
-                </form>
-              </div>
-              )}
-
-              {/* SUB-FORM 2: PEMBATALAN (VOID) CURAH HUJAN HARIAN */}
-              {(correctionDatasetFilter === 'ALL' || correctionDatasetFilter === 'CURAH_HUJAN') && (
-              <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
-                <div className="flex items-center space-x-2 mb-3 pb-2 border-b border-slate-100">
-                  <div className="p-1.5 bg-rose-100 rounded text-rose-800">
-                    <Trash2 size={16} />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-800">2. Pembatalan (Void) Rekor Curah Hujan</h4>
-                    <p className="text-[11px] text-slate-500">Batalkan/anulir rekor observasi harian yang salah/rusak</p>
-                  </div>
-                </div>
-
-                <form onSubmit={handleVoidRainfall} className="space-y-3 text-xs">
-                  <div>
-                    <label className="block text-slate-600 font-medium mb-1">Pos Pengamatan:</label>
-                    <select
-                      value={voidChStationId}
-                      onChange={(e) => setVoidChStationId(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 font-mono text-xs focus:bg-white"
-                    >
-                      {masterStations.length > 0 ? (
-                        masterStations.map((st) => (
-                          <option key={st.station_id} value={st.station_id}>
-                            {st.station_name} ({st.station_id}) - {st.kabupaten}
-                          </option>
-                        ))
-                      ) : (
-                        <option value="21720201A">Stamet Raja Haji Fisabilillah (21720201A)</option>
-                      )}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-600 font-medium mb-1">Tanggal Observasi:</label>
-                    <input
-                      type="date"
-                      value={voidChDate}
-                      onChange={(e) => setVoidChDate(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 font-mono text-xs"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-600 font-medium mb-1">Alasan Pembatalan (Audit Trail):</label>
-                    <input
-                      type="text"
-                      placeholder="Contoh: Penangkar rusak / air meluap"
-                      value={voidChReason}
-                      onChange={(e) => setVoidChReason(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 text-xs"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between pt-1">
-                    <span className="text-[11px] text-slate-400">
-                      Operator: <span className="font-semibold text-slate-600">{voidChOperator}</span>
-                    </span>
-                    <button
-                      type="submit"
-                      disabled={voidChLoading}
-                      className="px-3 py-1.5 bg-rose-700 hover:bg-rose-800 text-white rounded text-xs font-semibold transition disabled:opacity-50"
-                    >
-                      {voidChLoading ? 'Membatalkan...' : 'Void Rekor CH'}
-                    </button>
-                  </div>
-                </form>
-              </div>
-              )}
-
               {/* SUB-FORM 3: PEMBATALAN (VOID) REKOR SPI TERISOLASI */}
               {(correctionDatasetFilter === 'ALL' || correctionDatasetFilter === 'SPI') && (
               <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">

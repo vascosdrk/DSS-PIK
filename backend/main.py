@@ -3738,21 +3738,122 @@ def rainfall_v2_delete_preview(payload: Dict[str, Any]):
     tags=["Rainfall Input V2"],
     summary="Atomically soft-delete (VOID) rainfall records by period with full audit trail",
 )
-def rainfall_v2_delete_commit(payload: Dict[str, Any]):
+def rainfall_v2_delete_commit(request: Request, payload: Dict[str, Any]):
     from backend.rainfall_ingestion_v2 import commit_delete_rainfall_period
+    user_info = getattr(request.state, "user", None) or {}
+    auth_operator = user_info.get("username") or user_info.get("sub") or payload.get("operator") or "AUTHENTICATED_OPERATOR"
     try:
         return commit_delete_rainfall_period(
             regency_code=payload["regency_code"],
             start_date=payload["start_date"],
             end_date=payload["end_date"],
             reason=payload.get("reason", ""),
-            operator=payload.get("operator") or "OPERATOR_BMKG",
+            operator=auth_operator,
             station_ids=payload.get("station_ids"),
         )
     except (KeyError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Gagal menghapus data curah hujan: {e}")
+
+
+@app.get(
+    "/api/v1/rainfall/v2/records",
+    tags=["Rainfall Input V2"],
+    summary="Query rainfall records for Tab 3 Management Center with standardized display values",
+)
+def rainfall_v2_query_records(
+    regency_code: Optional[str] = Query(None),
+    station_id: Optional[str] = Query(None),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    obs_status: Optional[str] = Query(None),
+    source: Optional[str] = Query(None),
+    include_void: bool = Query(False),
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+):
+    from backend.rainfall_ingestion_v2 import query_rainfall_records_v2
+    try:
+        return query_rainfall_records_v2(
+            regency_code=regency_code,
+            station_id=station_id,
+            start_date=start_date,
+            end_date=end_date,
+            obs_status=obs_status,
+            source=source,
+            include_void=include_void,
+            limit=limit,
+            offset=offset,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gagal memuat rekaman curah hujan: {e}")
+
+
+@app.post(
+    "/api/v1/rainfall/v2/records/correct",
+    tags=["Rainfall Input V2"],
+    summary="Correct a rainfall record using standardized meteorological value types and authenticated operator",
+)
+def rainfall_v2_correct_record(request: Request, payload: Dict[str, Any]):
+    from backend.rainfall_ingestion_v2 import correct_rainfall_record_v2
+    user_info = getattr(request.state, "user", None) or {}
+    auth_operator = user_info.get("username") or user_info.get("sub") or "AUTHENTICATED_OPERATOR"
+    try:
+        return correct_rainfall_record_v2(
+            station_id=payload["station_id"],
+            observation_date=payload["observation_date"],
+            value_type=payload["value_type"],
+            rainfall_mm=payload.get("rainfall_mm"),
+            reason=payload.get("reason", ""),
+            operator=auth_operator,
+        )
+    except (KeyError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gagal mengoreksi rekaman curah hujan: {e}")
+
+
+@app.post(
+    "/api/v1/rainfall/v2/records/void-selected",
+    tags=["Rainfall Input V2"],
+    summary="Soft-delete (VOID) one or more selected rainfall records atomically",
+)
+def rainfall_v2_void_selected(request: Request, payload: Dict[str, Any]):
+    from backend.rainfall_ingestion_v2 import void_selected_rainfall_records
+    user_info = getattr(request.state, "user", None) or {}
+    auth_operator = user_info.get("username") or user_info.get("sub") or "AUTHENTICATED_OPERATOR"
+    try:
+        return void_selected_rainfall_records(
+            records=payload.get("records", []),
+            reason=payload.get("reason", ""),
+            operator=auth_operator,
+        )
+    except (KeyError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gagal membatalkan rekaman terpilih: {e}")
+
+
+@app.post(
+    "/api/v1/rainfall/v2/void-batches/{batch_id}/recover",
+    tags=["Rainfall Input V2"],
+    summary="Recover a VOID batch safely with post-VOID conflict protection",
+)
+def rainfall_v2_recover_void_batch(batch_id: str, request: Request, payload: Dict[str, Any]):
+    from backend.rainfall_ingestion_v2 import recover_void_batch_v2
+    user_info = getattr(request.state, "user", None) or {}
+    auth_operator = user_info.get("username") or user_info.get("sub") or "AUTHENTICATED_OPERATOR"
+    try:
+        return recover_void_batch_v2(
+            batch_id=batch_id,
+            reason=payload.get("reason", ""),
+            operator=auth_operator,
+        )
+    except (KeyError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gagal memulihkan batch VOID: {e}")
 
 
 # ==============================================================================
