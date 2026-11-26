@@ -94,6 +94,21 @@ export default function SpiGeneratorModal({
       setOutputStartDate('');
       setOutputEndDate('');
       fetchOptions();
+      // Auto-reattach if an active QUEUED/RUNNING SPI job already exists in MariaDB
+      authFetch(`${API_ENDPOINTS.SPI_GENERATOR_JOBS}?limit=5`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          const running = (data?.jobs || []).find((j) => j.status === 'QUEUED' || j.status === 'RUNNING');
+          if (running) {
+            setActiveJobId(running.job_id);
+            setJobProgress(running);
+            setResolution(running.resolution || 'HARIAN');
+            setTimescale(Number(running.timescale || 30));
+            setExecuting(true);
+            setStep(2);
+          }
+        })
+        .catch(() => {});
     } else {
       setActiveJobId(null);
     }
@@ -738,6 +753,15 @@ export default function SpiGeneratorModal({
               <div>
                 <h4 className="text-sm font-bold text-rose-900">Kalkulasi SPI Gagal</h4>
                 <p className="text-xs text-rose-600 mt-1 max-w-md mx-auto">{execError}</p>
+                {activeJobId && (
+                  <div className="mt-2 inline-block text-left bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-[11px] font-mono text-slate-600 space-y-0.5">
+                    <div>Job ID: <strong>{activeJobId}</strong></div>
+                    {jobProgress?.stage_message && <div>Tahap: {jobProgress.stage_message}</div>}
+                    <div>
+                      Selesai: <strong>{jobProgress?.success_count ?? 0}</strong> &bull; Gagal: <strong>{jobProgress?.error_count ?? 0}</strong> / {jobProgress?.total_stations ?? 0} pos
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="flex items-center justify-center gap-2">
                 <button

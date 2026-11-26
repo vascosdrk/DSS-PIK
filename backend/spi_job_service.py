@@ -18,6 +18,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import multiprocessing
 import os
 import threading
 import time
@@ -239,7 +240,9 @@ def _run_spi_job_worker(job_id: str, params: Dict[str, Any]) -> None:
 
         if n_workers > 1 and total_stns > 1:
             try:
-                with ProcessPoolExecutor(max_workers=n_workers) as pool:
+                # Explicitly use 'spawn' context on Linux Docker to avoid fork()-in-multithreaded-uvicorn deadlocks
+                mp_ctx = multiprocessing.get_context("spawn")
+                with ProcessPoolExecutor(max_workers=n_workers, mp_context=mp_ctx) as pool:
                     fut_to_sid = {
                         pool.submit(
                             calculate_station_spi_worker,
