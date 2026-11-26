@@ -191,3 +191,31 @@ Akses melalui **Pusat Data → Data Curah Hujan → Tombol `Hapus Data`** (`Rain
 - Tombol terpisah `Hapus Data` pada halaman Data Curah Hujan telah dihapus; tersisa hanya **Input / Pembaruan Data CH** dan **Koreksi & Kelola CH** (langsung mengarah ke Tab 3 dengan filter Curah Hujan aktif).
 - Seluruh operasi **Filter & Tabel Observasi Standar (`-`, `TTU`, `9999`, mm)**, **Koreksi 5 Jenis Nilai**, **Pembatalan Rekaman Terpilih & Periode (VOID)**, **Pemulihan Batch VOID dengan Proteksi Konflik**, dan **Audit Log** terpusat di Tab 3 (`RainfallManagementTab.jsx`).
 - Seluruh endpoint mutasi Tab 3 menggunakan identitas operator dari sesi autentikasi aktual (`request.state.user["username"]`).
+
+
+---
+
+## 11. Arsitektur Generator SPI Asinkron & Pencegahan HTTP 524
+
+### Akar Masalah HTTP 524 pada Generator SPI Daily
+- **HTTP 524 ("A Timeout Occurred")** berasal dari **Cloudflare Proxy** yang memutus koneksi HTTP jika origin tidak mengembalikan response dalam **100 detik**.
+- Pada implementasi sebelumnya, `POST /api/v1/spi/generator/execute` menjalankan seluruh perhitungan `si.spi(..., fit_freq="D")` secara **sinkron** untuk 52 stasiun (`~5.395` observasi/pos, 366 hari kalender × 52 pos = `19.032` fitting MLE `scipy.stats`).
+- Pengukuran lokal (`cews_db_migration_test`, `280.559` baris): rata-rata `12,19 detik/stasiun` → estimasi `~633,7 detik` serial / `~316,8 detik` (2 CPU) / `~158,4 detik` (4 CPU), sehingga pasti melewati batas 100 detik Cloudflare sekaligus memicu timeout 120 detik Joblib `loky`.
+
+### Solusi Arsitektur: MariaDB-Backed Asynchronous Job Engine
+- **Tanpa layanan eksternal baru (tanpa Redis)**: menggunakan tabel persisten `cews_spi_generation_jobs` (`database/migrations/20261126_add_spi_generation_jobs.sql`, aditif `CREATE TABLE IF NOT EXISTS`, rollback: `DROP TABLE IF EXISTS cews_spi_generation_jobs`).
+- **Alur Non-Blocking**:
+  1. `POST /api/v1/spi/generator/jobs` memvalidasi parameter, mencegah duplikasi job aktif identik (`job_key`), mencatat status `QUEUED` di MariaDB, menjalankan worker latar belakang, dan mengembalikan `job_id` dalam `< 1 detik` (**0 risiko HTTP 524**).
+  2. Worker (`backend/spi_job_service.py`) mengambil data CH aktif (mengecualikan `VOID` serta menghilangkan SQL `ORDER BY` sehingga menghindari `Using filesort` pada `280K` baris), menjalankan `si.spi()` dengan metode ilmiah identik (`prob_zero=True`, `all_zero_policy="stagge"`, `fitting_policy="standard"`, `BestDist`) menggunakan `ProcessPoolExecutor` + `as_completed()`, dan memperbarui progres per stasiun serta `heartbeat_at` secara real-time di MariaDB.
+  3. Hasil staging disimpan ke disk (`data/raw/spi/_staging/{session_token}.parquet`) sehingga tahan terhadap restart container sebelum commit atomik ke Parquet kanonikal.
+  4. Job yang terhenti akibat restart container (`heartbeat_at > 5 menit`) otomatis ditandai `FAILED` oleh `recover_stale_spi_jobs()` agar operator dapat menjalankan `POST /api/v1/spi/generator/jobs/{job_id}/retry`.
+- **Integrasi CH → SPI**: Record `VOID`, `TTU`, `MISSING`, dan `DAMAGED` dipetakan ke `NaN` (tidak pernah dianggap `0 mm`); hanya `OBSERVED_ZERO` (`-`) yang dihitung sebagai `0.0 mm` valid.
+
+### Endpoint Job SPI Asinkron
+| Method | Endpoint | Fungsi |
+|---|---|---|
+| `POST` | `/api/v1/spi/generator/jobs` | Mendaftarkan job SPI asinkron (mengembalikan `job_id` segera) |
+| `GET` | `/api/v1/spi/generator/jobs` | Daftar riwayat job SPI terbaru |
+| `GET` | `/api/v1/spi/generator/jobs/{job_id}` | Polling progres real-time (`progress_pct`, `completed_stations`, `status`, hasil saat `SUCCEEDED`) |
+| `POST` | `/api/v1/spi/generator/jobs/{job_id}/cancel` | Membatalkan job `QUEUED`/`RUNNING` |
+| `POST` | `/api/v1/spi/generator/jobs/{job_id}/retry` | Mengulang job `FAILED`/`CANCELLED` |

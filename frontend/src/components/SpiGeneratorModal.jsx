@@ -45,8 +45,10 @@ export default function SpiGeneratorModal({
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState(null);
 
-  // Execution & Staging Session State
+  // Execution & Async Job State
   const [executing, setExecuting] = useState(false);
+  const [activeJobId, setActiveJobId] = useState(null);
+  const [jobProgress, setJobProgress] = useState(null);
   const [execResult, setExecResult] = useState(null);
   const [execError, setExecError] = useState(null);
   const [commitLoading, setCommitLoading] = useState(false);
@@ -83,6 +85,8 @@ export default function SpiGeneratorModal({
   useEffect(() => {
     if (isOpen) {
       setStep(1);
+      setActiveJobId(null);
+      setJobProgress(null);
       setExecResult(null);
       setExecError(null);
       setCommitResult(null);
@@ -90,8 +94,48 @@ export default function SpiGeneratorModal({
       setOutputStartDate('');
       setOutputEndDate('');
       fetchOptions();
+    } else {
+      setActiveJobId(null);
     }
   }, [isOpen, fetchOptions]);
+
+  // Poll active async SPI job every 2 seconds (prevents Cloudflare HTTP 524 timeouts)
+  useEffect(() => {
+    if (!isOpen || !activeJobId || step !== 2) return undefined;
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const res = await authFetch(API_ENDPOINTS.SPI_GENERATOR_JOB_STATUS(activeJobId));
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        setJobProgress(data);
+        if (data.status === 'SUCCEEDED') {
+          setExecResult({
+            session_token: data.session_token,
+            status: 'COMPLETED',
+            summary: data.summary,
+            results_detail: data.results_detail,
+            sample_preview: data.sample_preview,
+          });
+          setExecuting(false);
+          setStep(3);
+        } else if (data.status === 'FAILED' || data.status === 'CANCELLED') {
+          setExecError(data.error_message || data.stage_message || `Job SPI berakhir dengan status ${data.status}.`);
+          setExecuting(false);
+          setStep(4);
+        }
+      } catch (err) {
+        console.error('Polling SPI job error:', err);
+      }
+    };
+    poll();
+    const timer = setInterval(poll, 2000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [isOpen, activeJobId, step]);
 
   // Handle Resolution Change
   const handleResolutionChange = (res) => {
@@ -130,10 +174,11 @@ export default function SpiGeneratorModal({
     }
   };
 
-  // 3. Execute Parallel Calculation
+  // 3. Submit Asynchronous SPI Generation Job (instant response, zero HTTP 524)
   const handleExecuteCalculation = async () => {
     setExecuting(true);
     setExecError(null);
+    setJobProgress(null);
     setStep(2);
     try {
       const payload = {
@@ -144,23 +189,52 @@ export default function SpiGeneratorModal({
         output_end_date: outputEndDate || null,
         n_workers: Number(workerCount) || 4
       };
-      const res = await authFetch(API_ENDPOINTS.SPI_GENERATOR_EXECUTE, {
+      const res = await authFetch(API_ENDPOINTS.SPI_GENERATOR_JOBS, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson.detail || `HTTP ${res.status}: Kalkulasi SPI gagal.`);
+        throw new Error(errJson.detail || `HTTP ${res.status}: Gagal mendaftarkan job kalkulasi SPI.`);
       }
       const data = await res.json();
-      setExecResult(data);
-      setStep(3);
+      setActiveJobId(data.job_id);
+      setJobProgress(data);
     } catch (err) {
       setExecError(err.message);
-      setStep(4);
-    } finally {
       setExecuting(false);
+      setStep(4);
+    }
+  };
+
+  const handleCancelJob = async () => {
+    if (!activeJobId) return;
+    try {
+      await authFetch(API_ENDPOINTS.SPI_GENERATOR_JOB_CANCEL(activeJobId), { method: 'POST' });
+    } catch (err) {
+      console.error('Cancel SPI job error:', err);
+    }
+  };
+
+  const handleRetryJob = async () => {
+    if (!activeJobId) {
+      handleExecuteCalculation();
+      return;
+    }
+    setExecuting(true);
+    setExecError(null);
+    setStep(2);
+    try {
+      const res = await authFetch(API_ENDPOINTS.SPI_GENERATOR_JOB_RETRY(activeJobId), { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Gagal mengulang job SPI.');
+      setActiveJobId(data.job_id);
+      setJobProgress(data);
+    } catch (err) {
+      setExecError(err.message);
+      setExecuting(false);
+      setStep(4);
     }
   };
 
@@ -526,19 +600,50 @@ export default function SpiGeneratorModal({
             </div>
           )}
 
-          {/* STEP 2: Processing in Background */}
+          {/* STEP 2: Asynchronous Background Job Progress */}
           {step === 2 && (
-            <div className="py-12 flex flex-col items-center justify-center space-y-4 text-center">
+            <div className="py-8 flex flex-col items-center justify-center space-y-5 text-center max-w-lg mx-auto">
               <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
               <div>
-                <h4 className="text-sm font-bold text-slate-800">Menjalankan Perhitungan SPI Multiprocessing...</h4>
-                <p className="text-xs text-slate-500 mt-1">
-                  Menerapkan fitting distribusi terbaik (<code>BestDist_Consensus</code>) secara paralel untuk deret waktu pos hujan
+                <h4 className="text-sm font-bold text-slate-800">
+                  Menjalankan Kalkulasi SPI Asinkron ({resolution} {timescale}D)
+                </h4>
+                <p className="text-xs text-slate-600 mt-1">
+                  {jobProgress?.stage_message || 'Mendaftarkan job dan memuat deret curah hujan MariaDB...'}
                 </p>
               </div>
-              <div className="text-[11px] text-slate-400 font-mono">
-                Menggunakan engine Joblib (backend: loky, {workerCount} workers)
+
+              <div className="w-full space-y-1.5">
+                <div className="flex justify-between text-xs font-mono text-slate-600">
+                  <span>
+                    {jobProgress?.completed_stations ?? 0} / {jobProgress?.total_stations || selectedStationIds.length} stasiun
+                  </span>
+                  <span className="font-bold text-indigo-700">
+                    {Number(jobProgress?.progress_pct || 0).toFixed(0)}%
+                  </span>
+                </div>
+                <div className="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-indigo-600 transition-all duration-500"
+                    style={{ width: `${Math.min(100, Math.max(4, Number(jobProgress?.progress_pct || 0)))}%` }}
+                  />
+                </div>
               </div>
+
+              <div className="text-[11px] text-slate-400 font-mono space-y-0.5">
+                {activeJobId && <div>Job ID: {activeJobId}</div>}
+                {jobProgress?.current_station && <div>Pos terakhir selesai: {jobProgress.current_station}</div>}
+              </div>
+
+              {activeJobId && (
+                <button
+                  type="button"
+                  onClick={handleCancelJob}
+                  className="px-4 py-1.5 rounded-lg border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold transition"
+                >
+                  Batalkan Job
+                </button>
+              )}
             </div>
           )}
 
@@ -634,13 +739,23 @@ export default function SpiGeneratorModal({
                 <h4 className="text-sm font-bold text-rose-900">Kalkulasi SPI Gagal</h4>
                 <p className="text-xs text-rose-600 mt-1 max-w-md mx-auto">{execError}</p>
               </div>
-              <button
-                type="button"
-                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-semibold rounded-lg"
-                onClick={() => setStep(1)}
-              >
-                Kembali ke Pengaturan
-              </button>
+              <div className="flex items-center justify-center gap-2">
+                <button
+                  type="button"
+                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-semibold rounded-lg"
+                  onClick={() => setStep(1)}
+                >
+                  Kembali ke Pengaturan
+                </button>
+                <button
+                  type="button"
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg inline-flex items-center gap-1.5"
+                  onClick={handleRetryJob}
+                >
+                  <RotateCcw size={13} />
+                  <span>Coba Lagi (Retry)</span>
+                </button>
+              </div>
             </div>
           )}
 

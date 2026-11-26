@@ -3554,6 +3554,108 @@ def post_spi_generator_commit_endpoint(
         raise HTTPException(status_code=500, detail=f"Gagal commit hasil SPI: {e}")
 
 
+@app.post(
+    "/api/v1/spi/generator/jobs",
+    tags=["SPI Generator"],
+    summary="Submit an asynchronous MariaDB-backed SPI generation job (eliminates HTTP 524 timeouts)",
+)
+def post_spi_generator_job_endpoint(
+    request: Request,
+    req: SpiGeneratorExecuteRequest,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user),
+):
+    from backend.spi_job_service import submit_spi_generation_job
+    user_info = getattr(request.state, "user", None) or current_user or {}
+    auth_operator = user_info.get("username") or user_info.get("sub") or "AUTHENTICATED_OPERATOR"
+    try:
+        return submit_spi_generation_job(
+            resolution=req.resolution,
+            timescale=req.timescale,
+            selected_stations=req.selected_stations,
+            output_start_date=req.output_start_date,
+            output_end_date=req.output_end_date,
+            n_workers=req.n_workers or 4,
+            operator=auth_operator,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gagal mendaftarkan job SPI: {e}")
+
+
+@app.get(
+    "/api/v1/spi/generator/jobs",
+    tags=["SPI Generator"],
+    summary="List recent asynchronous SPI generation jobs",
+)
+def get_spi_generator_jobs_list_endpoint(
+    limit: int = Query(20, ge=1, le=100),
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user),
+):
+    from backend.spi_job_service import list_spi_jobs
+    try:
+        return {"jobs": list_spi_jobs(limit=limit)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gagal memuat daftar job SPI: {e}")
+
+
+@app.get(
+    "/api/v1/spi/generator/jobs/{job_id}",
+    tags=["SPI Generator"],
+    summary="Get real-time status and progress of an asynchronous SPI generation job",
+)
+def get_spi_generator_job_status_endpoint(
+    job_id: str,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user),
+):
+    from backend.spi_job_service import get_spi_job_status
+    try:
+        return get_spi_job_status(job_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gagal mengambil status job SPI: {e}")
+
+
+@app.post(
+    "/api/v1/spi/generator/jobs/{job_id}/cancel",
+    tags=["SPI Generator"],
+    summary="Cancel a QUEUED or RUNNING SPI generation job",
+)
+def post_spi_generator_job_cancel_endpoint(
+    job_id: str,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user),
+):
+    from backend.spi_job_service import cancel_spi_job
+    try:
+        return cancel_spi_job(job_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gagal membatalkan job SPI: {e}")
+
+
+@app.post(
+    "/api/v1/spi/generator/jobs/{job_id}/retry",
+    tags=["SPI Generator"],
+    summary="Retry a FAILED or CANCELLED SPI generation job",
+)
+def post_spi_generator_job_retry_endpoint(
+    job_id: str,
+    request: Request,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user),
+):
+    from backend.spi_job_service import retry_spi_job
+    user_info = getattr(request.state, "user", None) or current_user or {}
+    auth_operator = user_info.get("username") or user_info.get("sub") or "AUTHENTICATED_OPERATOR"
+    try:
+        return retry_spi_job(job_id, operator=auth_operator)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gagal mengulang job SPI: {e}")
+
+
 # ==============================================================================
 # RAINFALL DATA INPUT MODULE V2 (AUTO TEMPLATE DETECTION, MULTI-FORMAT & MANUAL)
 # ==============================================================================

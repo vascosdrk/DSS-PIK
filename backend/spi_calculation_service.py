@@ -401,10 +401,37 @@ def commit_spi_generation_session(session_token: str, operator_notes: Optional[s
 
 
 def _commit_spi_generation_session_impl(session_token: str, operator_notes: Optional[str] = None) -> Dict[str, Any]:
-    if session_token not in _GENERATOR_SESSIONS:
-        raise ValueError(f"Sesi generator '{session_token}' tidak ditemukan atau telah kedaluwarsa.")
+    staged_file_to_cleanup: Optional[Path] = None
+    if session_token in _GENERATOR_SESSIONS:
+        session = _GENERATOR_SESSIONS[session_token]
+        if session.get("staged_parquet_path"):
+            staged_file_to_cleanup = Path(session["staged_parquet_path"])
+    else:
+        # Fallback: recover staged Parquet artifact from persistent MariaDB job table (survives restarts!)
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT resolution, timescale, staged_parquet_path, target_parquet_path
+                    FROM cews_spi_generation_jobs
+                    WHERE session_token = %s AND status = 'SUCCEEDED'
+                    LIMIT 1
+                    """,
+                    (session_token,),
+                )
+                job_row = cur.fetchone()
+        if not job_row or not job_row.get("staged_parquet_path") or not Path(job_row["staged_parquet_path"]).exists():
+            raise ValueError(f"Sesi generator '{session_token}' tidak ditemukan atau telah kedaluwarsa.")
+        staged_file_to_cleanup = Path(job_row["staged_parquet_path"])
+        df_staged = pd.read_parquet(staged_file_to_cleanup)
+        session = {
+            "token": session_token,
+            "resolution": job_row["resolution"],
+            "timescale": int(job_row["timescale"]),
+            "target_parquet_path": Path(job_row["target_parquet_path"]),
+            "df_wide": df_staged,
+        }
 
-    session = _GENERATOR_SESSIONS[session_token]
     target_path = Path(session["target_parquet_path"])
     df_new = session["df_wide"]
 
@@ -458,8 +485,13 @@ def _commit_spi_generation_session_impl(session_token: str, operator_notes: Opti
             shutil.copy2(backup_path, target_path)
         raise RuntimeError(f"Gagal commit file Parquet: {e}")
 
-    # Remove staging session
-    del _GENERATOR_SESSIONS[session_token]
+    # Remove staging session & disk staging artifact
+    _GENERATOR_SESSIONS.pop(session_token, None)
+    if staged_file_to_cleanup and staged_file_to_cleanup.exists():
+        try:
+            staged_file_to_cleanup.unlink()
+        except Exception:
+            pass
 
     # Invalidate caches
     try:

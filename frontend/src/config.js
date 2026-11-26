@@ -173,11 +173,18 @@ export const API_ENDPOINTS = {
   GEO_LAYER: (layerName) => `${API_BASE_URL}/api/v1/geo/layers/${encodeURIComponent(layerName)}`,
   GEO_ZOM_ANALYSIS: (periodId) => `${API_BASE_URL}/api/v1/geo/zom-analysis${periodId ? `?period_id=${encodeURIComponent(periodId)}` : ''}`,
 
-  // SPI Generator Endpoints
+  // SPI Generator Endpoints (Async Job Queue + Legacy Sync)
   SPI_GENERATOR_OPTIONS: `${API_BASE_URL}/api/v1/spi/generator/options`,
   SPI_GENERATOR_PREVIEW: `${API_BASE_URL}/api/v1/spi/generator/preview`,
   SPI_GENERATOR_EXECUTE: `${API_BASE_URL}/api/v1/spi/generator/execute`,
   SPI_GENERATOR_COMMIT: `${API_BASE_URL}/api/v1/spi/generator/commit`,
+  SPI_GENERATOR_JOBS: `${API_BASE_URL}/api/v1/spi/generator/jobs`,
+  SPI_GENERATOR_JOB_STATUS: (jobId) =>
+    `${API_BASE_URL}/api/v1/spi/generator/jobs/${encodeURIComponent(jobId)}`,
+  SPI_GENERATOR_JOB_CANCEL: (jobId) =>
+    `${API_BASE_URL}/api/v1/spi/generator/jobs/${encodeURIComponent(jobId)}/cancel`,
+  SPI_GENERATOR_JOB_RETRY: (jobId) =>
+    `${API_BASE_URL}/api/v1/spi/generator/jobs/${encodeURIComponent(jobId)}/retry`,
 
   // Operational Ingestion & Multi-Scale SPI Trend
   STATION_SPI_TREND: (stationId, months = 12) =>
