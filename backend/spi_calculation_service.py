@@ -18,6 +18,10 @@ import numpy as np
 from joblib import Parallel, delayed
 
 from backend.database import get_db
+from backend.rainfall_normalization import (
+    build_station_numeric_series,
+    evaluate_output_date_range_compliance,
+)
 from backend.spi_distribution_registry import (
     get_station_scale_distribution,
     get_available_distributions_summary,
@@ -225,28 +229,17 @@ def execute_spi_generation(
                 SELECT station_id, observation_date, rainfall_mm, obs_status
                 FROM cews_rainfall_daily
                 WHERE station_id IN ({format_strings})
+                  AND (obs_status IS NULL OR UPPER(obs_status) != 'VOID')
                 ORDER BY station_id, observation_date ASC
             """
             cur.execute(query, tuple(target_sids))
             rows = cur.fetchall()
 
-    # Group series by station
-    # Standard DSS-PIK SPI rule:
-    # - OBSERVED_ZERO ('-') is valid 0.0 mm
-    # - TTU and MISSING/DAMAGED/VOID ('9999') are NEVER treated as 0 mm (mapped to NaN)
-    non_numeric_statuses = {"TTU", "MISSING", "DAMAGED", "VOID", "AMBIGUOUS"}
-    station_series: Dict[str, Dict[str, List[Any]]] = {sid: {"dates": [], "values": []} for sid in target_sids}
-    for r in rows:
-        sid = r["station_id"].strip().upper()
-        if sid in station_series:
-            d_str = r["observation_date"].strftime("%Y-%m-%d")
-            obs_st = (r.get("obs_status") or "").strip().upper()
-            if obs_st in non_numeric_statuses or r["rainfall_mm"] is None:
-                v = np.nan
-            else:
-                v = float(r["rainfall_mm"])
-            station_series[sid]["dates"].append(d_str)
-            station_series[sid]["values"].append(v)
+    # Group series by station using centralized DSS-PIK numeric normalization:
+    # - TTU and OBSERVED_ZERO ('-') -> 0.0 mm in numeric processing (TTU remains 'TTU' in CH table)
+    # - MISSING, MISSING_INTERNAL, DAMAGED, AMBIGUOUS -> NaN
+    # - VOID -> excluded
+    station_series = build_station_numeric_series(rows, target_sids)
 
     # Parallel calculation via Joblib with automatic Sequential fallback
     # On Windows, adaptively cap workers to 4 to prevent OS handle exhaustion
@@ -348,6 +341,17 @@ def execute_spi_generation(
     if output_end_date:
         df_wide = df_wide[df_wide.index <= pd.to_datetime(output_end_date)]
 
+    actual_start = df_wide.index.min().strftime("%Y-%m-%d") if not df_wide.empty else "-"
+    actual_end = df_wide.index.max().strftime("%Y-%m-%d") if not df_wide.empty else "-"
+    range_check = evaluate_output_date_range_compliance(
+        actual_start=actual_start,
+        actual_end=actual_end,
+        requested_start=output_start_date,
+        requested_end=output_end_date,
+        output_rows=len(df_wide),
+        resolution=preview["resolution"],
+    )
+
     session_token = f"SPI_GEN_{uuid.uuid4().hex[:12].upper()}"
     _GENERATOR_SESSIONS[session_token] = {
         "token": session_token,
@@ -363,8 +367,9 @@ def execute_spi_generation(
             "success_count": success_count,
             "error_count": error_count,
             "computed_rows": len(df_wide),
-            "date_range_start": df_wide.index.min().strftime("%Y-%m-%d") if not df_wide.empty else "-",
-            "date_range_end": df_wide.index.max().strftime("%Y-%m-%d") if not df_wide.empty else "-",
+            "date_range_start": actual_start,
+            "date_range_end": actual_end,
+            **range_check,
         }
     }
 

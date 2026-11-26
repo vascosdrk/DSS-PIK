@@ -20,7 +20,7 @@ import {
 import { API_ENDPOINTS, authFetch } from '../config';
 import { formatDateIndo } from '../utils/formatters';
 
-export default function SpiDataTable({ onOpenDownload, onOpenIngestion, onOpenManagement, onOpenGenerator }) {
+export default function SpiDataTable({ refreshTrigger = 0, onOpenDownload, onOpenIngestion, onOpenManagement, onOpenGenerator }) {
   // Main Switches: Period Type & Timescale
   const [periodType, setPeriodType] = useState('DASARIAN'); // 'DASARIAN' | 'DAILY'
   const [timescale, setTimescale] = useState('30D'); // '30D' | '90D'
@@ -79,10 +79,10 @@ export default function SpiDataTable({ onOpenDownload, onOpenIngestion, onOpenMa
       });
   }, [periodType, timescale, page, pageSize, order, startDate, endDate]);
 
-  // Trigger fetch on parameter change
+  // Trigger fetch on parameter change or non-remounting refreshTrigger increment
   useEffect(() => {
     fetchSpiData();
-  }, [fetchSpiData]);
+  }, [fetchSpiData, refreshTrigger]);
 
   // Reset page when switching mode or dates
   const handleSwitchPeriodType = (newType) => {

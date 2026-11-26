@@ -15,6 +15,7 @@ import pandas as pd
 import pytest
 
 from backend.database import get_db
+from backend.rainfall_normalization import build_station_numeric_series
 from backend.spi_calculation_service import _GENERATOR_SESSIONS
 from backend.spi_calculation_worker import calculate_station_spi_worker
 from backend.spi_job_service import (
@@ -65,7 +66,7 @@ def test_spi_daily_async_job_numerical_parity_and_staged_parquet():
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    SELECT observation_date, rainfall_mm, obs_status
+                    SELECT station_id, observation_date, rainfall_mm, obs_status
                     FROM cews_rainfall_daily
                     WHERE station_id = %s AND (obs_status IS NULL OR UPPER(obs_status) != 'VOID')
                     ORDER BY observation_date ASC
@@ -73,14 +74,7 @@ def test_spi_daily_async_job_numerical_parity_and_staged_parquet():
                     ("21010801A",),
                 )
                 rows = cur.fetchall()
-        non_num = {"TTU", "MISSING", "DAMAGED", "VOID", "AMBIGUOUS"}
-        s_dict = {
-            "dates": [r["observation_date"].strftime("%Y-%m-%d") for r in rows],
-            "values": [
-                np.nan if ((r.get("obs_status") or "").upper() in non_num or r["rainfall_mm"] is None) else float(r["rainfall_mm"])
-                for r in rows
-            ],
-        }
+        s_dict = build_station_numeric_series(rows, ["21010801A"])["21010801A"]
         direct = calculate_station_spi_worker("21010801A", s_dict, "HARIAN", 30, "gam")
         assert direct["status"] == "SUCCESS"
         s_direct = pd.Series(direct["series_data"]["values"], index=pd.to_datetime(direct["series_data"]["dates"]))

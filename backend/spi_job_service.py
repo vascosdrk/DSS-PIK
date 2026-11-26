@@ -32,6 +32,10 @@ import numpy as np
 import pandas as pd
 
 from backend.database import get_db
+from backend.rainfall_normalization import (
+    build_station_numeric_series,
+    evaluate_output_date_range_compliance,
+)
 from backend.spi_calculation_service import (
     RESOLUTION_CONFIG,
     SPI_RAW_DIR,
@@ -216,15 +220,7 @@ def _run_spi_job_worker(job_id: str, params: Dict[str, Any]) -> None:
         if _is_job_cancelled_in_db(job_id):
             return
 
-        non_numeric_statuses = {"TTU", "MISSING", "DAMAGED", "VOID", "AMBIGUOUS"}
-        station_series: Dict[str, Dict[str, List[Any]]] = {sid: {"dates": [], "values": []} for sid in target_sids}
-        for r in rows:
-            sid = r["station_id"].strip().upper()
-            if sid in station_series:
-                obs_st = (r.get("obs_status") or "").strip().upper()
-                v = np.nan if (obs_st in non_numeric_statuses or r["rainfall_mm"] is None) else float(r["rainfall_mm"])
-                station_series[sid]["dates"].append(r["observation_date"].strftime("%Y-%m-%d"))
-                station_series[sid]["values"].append(v)
+        station_series = build_station_numeric_series(rows, target_sids)
 
         n_workers = max(1, min(int(params.get("n_workers") or 4), os.cpu_count() or 2, 4))
         _update_job_fields(
@@ -373,14 +369,26 @@ def _run_spi_job_worker(job_id: str, params: Dict[str, Any]) -> None:
         target_parquet = RESOLUTION_CONFIG[preview["resolution"]]["output_parquet"][int(preview["timescale"])]
         elapsed = round(time.perf_counter() - t_start, 2)
 
+        actual_start = df_wide.index.min().strftime("%Y-%m-%d") if not df_wide.empty else "-"
+        actual_end = df_wide.index.max().strftime("%Y-%m-%d") if not df_wide.empty else "-"
+        range_check = evaluate_output_date_range_compliance(
+            actual_start=actual_start,
+            actual_end=actual_end,
+            requested_start=params.get("output_start_date"),
+            requested_end=params.get("output_end_date"),
+            output_rows=len(df_wide),
+            resolution=preview["resolution"],
+        )
+
         summary = {
             "total_requested": total_stns,
             "success_count": success_cnt,
             "error_count": error_cnt,
             "computed_rows": len(df_wide),
-            "date_range_start": df_wide.index.min().strftime("%Y-%m-%d") if not df_wide.empty else "-",
-            "date_range_end": df_wide.index.max().strftime("%Y-%m-%d") if not df_wide.empty else "-",
+            "date_range_start": actual_start,
+            "date_range_end": actual_end,
             "elapsed_seconds": elapsed,
+            **range_check,
         }
         sample_preview = {
             "dates": [d.strftime("%Y-%m-%d") for d in df_wide.index[-5:]] if not df_wide.empty else [],

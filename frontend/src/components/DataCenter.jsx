@@ -27,6 +27,8 @@ export default function DataCenter({ initialSubTab = 'rainfall', activePeriodId 
   const [showIngestionModal, setShowIngestionModal] = useState(false);
   const [showRainfallInputModal, setShowRainfallInputModal] = useState(false);
   const [showGeneratorModal, setShowGeneratorModal] = useState(false);
+  const [generatorContext, setGeneratorContext] = useState({ resolution: 'DASARIAN', timescale: 30 });
+  const [spiRefreshTrigger, setSpiRefreshTrigger] = useState(0);
   const [ingestionCategory, setIngestionCategory] = useState('AUTO_DETECT');
   const [managementInitialTab, setManagementInitialTab] = useState('STORAGE');
   const [managementCorrectionFilter, setManagementCorrectionFilter] = useState('ALL');
@@ -54,6 +56,15 @@ export default function DataCenter({ initialSubTab = 'rainfall', activePeriodId 
   };
 
   const handleOpenGenerator = (resType, ts) => {
+    const rawRes = String(resType || 'DASARIAN').trim().toUpperCase();
+    const mappedRes = rawRes === 'DAILY' || rawRes === 'HARIAN'
+      ? 'HARIAN'
+      : rawRes === 'BULANAN'
+        ? 'BULANAN'
+        : 'DASARIAN';
+    const rawTs = String(ts || '30').trim().toUpperCase();
+    const mappedTs = rawTs.includes('90') ? 90 : 30;
+    setGeneratorContext({ resolution: mappedRes, timescale: mappedTs });
     setShowGeneratorModal(true);
   };
 
@@ -167,7 +178,7 @@ export default function DataCenter({ initialSubTab = 'rainfall', activePeriodId 
         {activeSubTab === 'spi' && (
           <div className="data-panel-fade-in">
             <SpiDataTable
-              key={`spi-${refreshKey}`}
+              refreshTrigger={spiRefreshTrigger}
               onOpenDownload={handleOpenDownload}
               onOpenIngestion={handleOpenIngestion}
               onOpenManagement={handleOpenManagement}
@@ -228,6 +239,7 @@ export default function DataCenter({ initialSubTab = 'rainfall', activePeriodId 
           }}
           onIngestionSuccess={(res) => {
             setRefreshKey((prev) => prev + 1);
+            setSpiRefreshTrigger((prev) => prev + 1);
             if (onDataIngestionCommitted) {
               onDataIngestionCommitted(res);
             }
@@ -252,8 +264,10 @@ export default function DataCenter({ initialSubTab = 'rainfall', activePeriodId 
         <SpiGeneratorModal
           isOpen={showGeneratorModal}
           onClose={() => setShowGeneratorModal(false)}
+          initialResolution={generatorContext.resolution}
+          initialTimescale={generatorContext.timescale}
           onGenerationSuccess={(data) => {
-            setRefreshKey((prev) => prev + 1);
+            setSpiRefreshTrigger((prev) => prev + 1);
             if (onDataIngestionCommitted) {
               onDataIngestionCommitted({ data_type: 'SPI_GENERATOR', data });
             }

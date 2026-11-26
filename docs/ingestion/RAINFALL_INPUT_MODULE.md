@@ -209,7 +209,7 @@ Akses melalui **Pusat Data → Data Curah Hujan → Tombol `Hapus Data`** (`Rain
   2. Worker (`backend/spi_job_service.py`) mengambil data CH aktif (mengecualikan `VOID` serta menghilangkan SQL `ORDER BY` sehingga menghindari `Using filesort` pada `280K` baris), menjalankan `si.spi()` dengan metode ilmiah identik (`prob_zero=True`, `all_zero_policy="stagge"`, `fitting_policy="standard"`, `BestDist`) menggunakan `ProcessPoolExecutor` + `as_completed()`, dan memperbarui progres per stasiun serta `heartbeat_at` secara real-time di MariaDB.
   3. Hasil staging disimpan ke disk (`data/raw/spi/_staging/{session_token}.parquet`) sehingga tahan terhadap restart container sebelum commit atomik ke Parquet kanonikal.
   4. Job yang terhenti akibat restart container (`heartbeat_at > 5 menit`) otomatis ditandai `FAILED` oleh `recover_stale_spi_jobs()` agar operator dapat menjalankan `POST /api/v1/spi/generator/jobs/{job_id}/retry`.
-- **Integrasi CH → SPI**: Record `VOID`, `TTU`, `MISSING`, dan `DAMAGED` dipetakan ke `NaN` (tidak pernah dianggap `0 mm`); hanya `OBSERVED_ZERO` (`-`) yang dihitung sebagai `0.0 mm` valid.
+- **Integrasi CH → SPI**: Menggunakan modul normalisasi terpusat `backend/rainfall_normalization.py` (lihat Bagian 12).
 
 ### Endpoint Job SPI Asinkron
 | Method | Endpoint | Fungsi |
@@ -219,3 +219,37 @@ Akses melalui **Pusat Data → Data Curah Hujan → Tombol `Hapus Data`** (`Rain
 | `GET` | `/api/v1/spi/generator/jobs/{job_id}` | Polling progres real-time (`progress_pct`, `completed_stations`, `status`, hasil saat `SUCCEEDED`) |
 | `POST` | `/api/v1/spi/generator/jobs/{job_id}/cancel` | Membatalkan job `QUEUED`/`RUNNING` |
 | `POST` | `/api/v1/spi/generator/jobs/{job_id}/retry` | Mengulang job `FAILED`/`CANCELLED` |
+
+
+---
+
+## 12. Kebijakan Normalisasi Numerik CH (`TTU = 0.0 mm`, `MISSING_INTERNAL = NaN`), Sinkronisasi Resolusi & Validasi Rentang Output SPI
+
+### 12.1. Pemisahan Representasi Tabel CH vs Lapisan Pengolahan Numerik
+Seluruh perhitungan numerik SPI (Daily, Dasarian, Bulanan; baik job asinkron maupun jalur sinkron) kini menggunakan satu sumber kebenaran di `backend/rainfall_normalization.py` (`normalize_rainfall_for_numeric()` & `build_station_numeric_series()`):
+
+| `obs_status` di MariaDB | Tampilan Tabel CH & Ekspor | Nilai Pengolahan Numerik (SPI) | Catatan |
+|---|---|---|---|
+| `OBSERVED_VALID` / `CORRECTED` | Angka aktual (`mm`) | `float(rainfall_mm)` | Nilai sentinel (`< 0` atau `>= 8888`) ditolak (`NaN`) |
+| `OBSERVED_ZERO` | `-` | `0.0` | Sah digunakan dalam akumulasi |
+| `TTU` (Hujan Tidak Terukur) | **`TTU`** (tetap dipertahankan) | **`0.0`** | Kebijakan operasional resmi; tidak mengubah data sumber di MariaDB |
+| `MISSING` / `MISSING_INTERNAL` | `9999` / Tidak tersedia | **`NaN`** | Tetap `NaN` meskipun record historis memiliki angka `rainfall_mm` |
+| `DAMAGED` / `AMBIGUOUS` | `9999` / Perlu verifikasi | **`NaN`** | Tidak pernah diisi `0.0` secara otomatis |
+| `VOID` | Dikecualikan | **Dikecualikan** | Disaring di SQL (`!= 'VOID'`) dan di `build_station_numeric_series()` |
+
+```
+[cews_rainfall_daily (MariaDB — tidak dimutasi)]
+       ├──► Tabel CH & Ekspor (/api/v1/rainfall/*) ──► Tampil asli: '-', 'TTU', '9999', angka mm
+       └──► backend/rainfall_normalization.py ───────► TTU=0.0, ZERO=0.0, MISSING/MISSING_INTERNAL/DAMAGED/AMBIGUOUS=NaN, VOID=skip
+                                                               │
+                                                               ▼
+                                                 si.spi (min_periods=30, BestDist, stagge)
+```
+
+### 12.2. Sinkronisasi Resolusi Generator & Pemeliharaan State Tabel SPI
+- `SpiDataTable.jsx` meneruskan `periodType` (`DAILY`/`DASARIAN`/`BULANAN`) dan `timescale` (`30D`/`90D`) ke `DataCenter.jsx` → `SpiGeneratorModal.jsx` melalui prop `initialResolution` dan `initialTimescale`.
+- Setelah commit Parquet berhasil (`onGenerationSuccess`), `DataCenter.jsx` menaikkan `spiRefreshTrigger` (tanpa mengganti React `key` pada `<SpiDataTable />`), sehingga tabel memuat ulang data terbaru sambil **mempertahankan resolusi, timescale, dan filter tanggal yang sedang aktif** (tidak lagi reset ke `DASARIAN`).
+
+### 12.3. Validasi Kesesuaian Rentang Tanggal Output
+- `evaluate_output_date_range_compliance()` pada `backend/rainfall_normalization.py` membandingkan rentang tanggal aktual (`date_range_start .. date_range_end`) dengan rentang yang diminta (`requested_start_date .. requested_end_date`).
+- Pada Step 3 `SpiGeneratorModal.jsx`, panel **Validasi Rentang Tanggal Output** menampilkan rentang diminta, rentang aktual, jumlah tanggal output, dan badge `SESUAI` / `TIDAK LENGKAP` beserta peringatan eksplisit apabila tanggal akhir hasil lebih awal daripada tanggal akhir yang diminta.

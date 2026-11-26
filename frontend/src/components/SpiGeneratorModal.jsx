@@ -19,17 +19,31 @@ import {
 } from 'lucide-react';
 import { API_ENDPOINTS, authFetch } from '../config';
 
+function normalizeGeneratorResolution(res) {
+  const raw = String(res || 'DASARIAN').trim().toUpperCase();
+  if (raw === 'DAILY' || raw === 'HARIAN') return 'HARIAN';
+  if (raw === 'BULANAN') return 'BULANAN';
+  return 'DASARIAN';
+}
+
+function normalizeGeneratorTimescale(ts) {
+  const raw = String(ts || '30').trim().toUpperCase();
+  return raw.includes('90') ? 90 : 30;
+}
+
 export default function SpiGeneratorModal({
   isOpen,
   onClose,
-  onGenerationSuccess
+  onGenerationSuccess,
+  initialResolution = 'DASARIAN',
+  initialTimescale = 30
 }) {
   // Wizard Step: 1 = Configure & Preview, 2 = Generating, 3 = Completed, 4 = Error
   const [step, setStep] = useState(1);
 
-  // Configuration State
-  const [resolution, setResolution] = useState('DASARIAN'); // 'HARIAN' | 'DASARIAN' | 'BULANAN'
-  const [timescale, setTimescale] = useState(30);           // 30 | 90
+  // Configuration State (synchronized with active SpiDataTable resolution & timescale)
+  const [resolution, setResolution] = useState(() => normalizeGeneratorResolution(initialResolution)); // 'HARIAN' | 'DASARIAN' | 'BULANAN'
+  const [timescale, setTimescale] = useState(() => normalizeGeneratorTimescale(initialTimescale));     // 30 | 90
   const [outputStartDate, setOutputStartDate] = useState('');
   const [outputEndDate, setOutputEndDate] = useState('');
   const [stationSearchQuery, setStationSearchQuery] = useState('');
@@ -85,6 +99,8 @@ export default function SpiGeneratorModal({
   useEffect(() => {
     if (isOpen) {
       setStep(1);
+      setResolution(normalizeGeneratorResolution(initialResolution));
+      setTimescale(normalizeGeneratorTimescale(initialTimescale));
       setActiveJobId(null);
       setJobProgress(null);
       setExecResult(null);
@@ -102,8 +118,8 @@ export default function SpiGeneratorModal({
           if (running) {
             setActiveJobId(running.job_id);
             setJobProgress(running);
-            setResolution(running.resolution || 'HARIAN');
-            setTimescale(Number(running.timescale || 30));
+            setResolution(normalizeGeneratorResolution(running.resolution));
+            setTimescale(normalizeGeneratorTimescale(running.timescale));
             setExecuting(true);
             setStep(2);
           }
@@ -112,7 +128,7 @@ export default function SpiGeneratorModal({
     } else {
       setActiveJobId(null);
     }
-  }, [isOpen, fetchOptions]);
+  }, [isOpen, initialResolution, initialTimescale, fetchOptions]);
 
   // Poll active async SPI job every 2 seconds (prevents Cloudflare HTTP 524 timeouts)
   useEffect(() => {
@@ -663,18 +679,80 @@ export default function SpiGeneratorModal({
           )}
 
           {/* STEP 3: Results Preview & Confirmation to Commit */}
-          {step === 3 && execResult && (
+          {step === 3 && execResult && (() => {
+            const summary = execResult.summary || {};
+            const reqStart = summary.requested_start_date || outputStartDate || null;
+            const reqEnd = summary.requested_end_date || outputEndDate || null;
+            const actStart = summary.date_range_start || '-';
+            const actEnd = summary.date_range_end || '-';
+            const outCount = summary.output_date_count ?? summary.computed_rows ?? 0;
+            const isDateCompliant = summary.date_range_compliant !== undefined
+              ? Boolean(summary.date_range_compliant)
+              : !(reqEnd && actEnd && actEnd !== '-' && actEnd < reqEnd) && outCount > 0;
+            const dateWarning = summary.date_range_warning || (
+              !isDateCompliant
+                ? `Tanggal akhir output aktual (${actEnd}) lebih awal daripada tanggal akhir yang diminta (${reqEnd || '-'}). Periksa ketersediaan data curah hujan MariaDB.`
+                : null
+            );
+
+            return (
             <div className="space-y-4">
-              <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-lg flex items-center space-x-3">
-                <CheckCircle2 size={24} className="text-emerald-600 shrink-0" />
+              <div className={`p-4 rounded-lg flex items-center space-x-3 border ${
+                isDateCompliant
+                  ? 'bg-emerald-50 border-emerald-300'
+                  : 'bg-amber-50 border-amber-300'
+              }`}>
+                {isDateCompliant ? (
+                  <CheckCircle2 size={24} className="text-emerald-600 shrink-0" />
+                ) : (
+                  <AlertTriangle size={24} className="text-amber-600 shrink-0" />
+                )}
                 <div>
-                  <h4 className="text-xs font-bold text-emerald-900">
-                    Kalkulasi SPI Selesai & Berada di Memori Staging
+                  <h4 className={`text-xs font-bold ${isDateCompliant ? 'text-emerald-900' : 'text-amber-900'}`}>
+                    {isDateCompliant
+                      ? 'Kalkulasi SPI Selesai & Berada di Memori Staging'
+                      : 'Kalkulasi Selesai dengan Peringatan Cakupan Tanggal Output'}
                   </h4>
-                  <p className="text-xs text-emerald-700">
-                    {execResult.summary.success_count} pos berhasil dihitung ({execResult.summary.computed_rows} baris deret waktu). File kanonikal belum diubah.
+                  <p className={`text-xs ${isDateCompliant ? 'text-emerald-700' : 'text-amber-800'}`}>
+                    {summary.success_count} pos berhasil dihitung ({outCount} tanggal output). File kanonikal belum diubah.
                   </p>
                 </div>
+              </div>
+
+              {/* Output Date Range Compliance Card */}
+              <div className="border border-slate-200 rounded-lg p-3 bg-slate-50/70 text-xs space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-700">Validasi Rentang Tanggal Output ({resolution} {timescale}D)</span>
+                  <span className={`px-2 py-0.5 rounded font-bold text-[11px] ${
+                    isDateCompliant
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                      : 'bg-amber-100 text-amber-800 border border-amber-300'
+                  }`}>
+                    {isDateCompliant ? 'SESUAI' : 'TIDAK LENGKAP'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 font-mono text-[11px]">
+                  <div className="bg-white border border-slate-200 rounded px-2.5 py-1.5">
+                    <span className="text-slate-500 block font-sans text-[10px]">Rentang Diminta</span>
+                    <strong className="text-slate-800">
+                      {reqStart || reqEnd ? `${reqStart || 'awal'} s.d. ${reqEnd || 'akhir'}` : 'Seluruh Deret'}
+                    </strong>
+                  </div>
+                  <div className="bg-white border border-slate-200 rounded px-2.5 py-1.5">
+                    <span className="text-slate-500 block font-sans text-[10px]">Rentang Aktual Dihasilkan</span>
+                    <strong className="text-slate-800">{actStart} s.d. {actEnd}</strong>
+                  </div>
+                  <div className="bg-white border border-slate-200 rounded px-2.5 py-1.5">
+                    <span className="text-slate-500 block font-sans text-[10px]">Jumlah Tanggal Output</span>
+                    <strong className="text-slate-800">{outCount} tanggal</strong>
+                  </div>
+                </div>
+                {dateWarning && (
+                  <div className="p-2.5 bg-amber-50 border border-amber-300 rounded text-amber-900 text-[11px] flex items-start space-x-2">
+                    <AlertTriangle size={15} className="text-amber-600 shrink-0 mt-0.5" />
+                    <span>{dateWarning}</span>
+                  </div>
+                )}
               </div>
 
               {/* Sample output preview */}
@@ -742,7 +820,8 @@ export default function SpiGeneratorModal({
                 </div>
               )}
             </div>
-          )}
+            );
+          })()}
 
           {/* STEP 4: Error State */}
           {step === 4 && (
