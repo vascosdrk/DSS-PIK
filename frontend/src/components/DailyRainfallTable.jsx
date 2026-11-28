@@ -189,10 +189,10 @@ export default function DailyRainfallTable({ onOpenInfo, onOpenDownload, onOpenI
                 type="button"
                 className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg border border-slate-300 transition"
                 onClick={() => onOpenManagement('CORRECTIONS', 'CURAH_HUJAN')}
-                title="Buka Tab 3: Koreksi & Pembatalan Rekaman Curah Hujan"
+                title="Buka panel Kelola Data Curah Hujan (Koreksi & Pembatalan Data)"
               >
                 <Edit3 size={13} />
-                <span>Koreksi &amp; Kelola CH</span>
+                <span>Kelola Data Curah Hujan</span>
               </button>
             )}
           </div>

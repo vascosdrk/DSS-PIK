@@ -845,7 +845,7 @@ def export_rainfall_data(
         writer.writerow(header)
         for r in rows_data:
             writer.writerow(r)
-        return output_str.getvalue().encode("utf-8"), "text/csv; charset=utf-8", filename
+        return output_str.getvalue().encode("utf-8-sig"), "text/csv; charset=utf-8", filename
 
 
 def export_spi_data(
@@ -926,7 +926,7 @@ def export_spi_data(
         writer.writerow(header)
         for r in rows_data:
             writer.writerow(r)
-        return output_str.getvalue().encode("utf-8"), "text/csv; charset=utf-8", filename
+        return output_str.getvalue().encode("utf-8-sig"), "text/csv; charset=utf-8", filename
 
 
 def export_probability_data(
@@ -1018,7 +1018,7 @@ def export_probability_data(
         writer.writerow(header)
         for r in rows_data:
             writer.writerow(r)
-        return output_str.getvalue().encode("utf-8"), "text/csv; charset=utf-8", filename
+        return output_str.getvalue().encode("utf-8-sig"), "text/csv; charset=utf-8", filename
 
 
 def get_probability_periods_list() -> Dict[str, Any]:
@@ -1085,4 +1085,176 @@ def get_probability_periods_list() -> Dict[str, Any]:
         "dasarian": dasarian_periods,
         "bulanan": bulanan_periods,
         "all": dasarian_periods + bulanan_periods,
+    }
+
+
+def get_export_availability_metadata() -> Dict[str, Any]:
+    """
+    Returns live actual data availability across all 4 operational datasets
+    (Rainfall, SPI, ECMWF Probability, ECMWF Deterministic) directly from
+    MariaDB and canonical Parquet files. Zero hardcoded dates or fake periods.
+    """
+    from backend.ecmwf_forecast_service import (
+        get_deterministic_periods_list,
+        get_deterministic_vintages,
+    )
+
+    # 1. Rainfall (cews_rainfall_daily, excluding VOID)
+    rainfall_meta: Dict[str, Any] = {
+        "available": False,
+        "min_date": None,
+        "max_date": None,
+        "stations_with_data": 0,
+        "total_records": 0,
+    }
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT
+                        MIN(observation_date) AS min_date,
+                        MAX(observation_date) AS max_date,
+                        COUNT(DISTINCT station_id) AS stations_with_data,
+                        COUNT(*) AS total_records
+                    FROM cews_rainfall_daily
+                    WHERE obs_status IS NULL OR UPPER(obs_status) != 'VOID'
+                """)
+                rr = cur.fetchone()
+                if rr and rr["total_records"] and int(rr["total_records"]) > 0:
+                    rainfall_meta = {
+                        "available": True,
+                        "min_date": rr["min_date"].strftime("%Y-%m-%d") if hasattr(rr["min_date"], "strftime") else str(rr["min_date"]),
+                        "max_date": rr["max_date"].strftime("%Y-%m-%d") if hasattr(rr["max_date"], "strftime") else str(rr["max_date"]),
+                        "stations_with_data": int(rr["stations_with_data"] or 0),
+                        "total_records": int(rr["total_records"] or 0),
+                    }
+    except Exception as exc:
+        rainfall_meta["error"] = str(exc)
+
+    # 2. SPI (Parquet canonical series by resolution & timescale; date is stored in DataFrame index)
+    spi_matrix: Dict[str, Dict[str, Any]] = {}
+    for pt in ("DASARIAN", "DAILY"):
+        for ts in ("30D", "90D"):
+            key = f"{pt}_{ts}"
+            try:
+                df = get_cached_spi_df(pt, ts)
+                if df is not None and not df.empty:
+                    idx_vals = df["date"] if "date" in df.columns else df.index
+                    valid_dates = pd.to_datetime(idx_vals, errors="coerce").dropna()
+                    stn_cols = [c for c in df.columns if c not in ("date", "period_id", "year", "month", "day", "dasarian")]
+                    stations_with_data = int(sum(1 for c in stn_cols if df[c].notna().any()))
+                    spi_matrix[key] = {
+                        "period_type": pt,
+                        "timescale": ts,
+                        "available": len(valid_dates) > 0 and stations_with_data > 0,
+                        "min_date": valid_dates.min().strftime("%Y-%m-%d") if len(valid_dates) > 0 else None,
+                        "max_date": valid_dates.max().strftime("%Y-%m-%d") if len(valid_dates) > 0 else None,
+                        "stations_with_data": stations_with_data,
+                        "total_rows": int(len(df)),
+                    }
+                else:
+                    spi_matrix[key] = {
+                        "period_type": pt,
+                        "timescale": ts,
+                        "available": False,
+                        "min_date": None,
+                        "max_date": None,
+                        "stations_with_data": 0,
+                        "total_rows": 0,
+                    }
+            except Exception:
+                spi_matrix[key] = {
+                    "period_type": pt,
+                    "timescale": ts,
+                    "available": False,
+                    "min_date": None,
+                    "max_date": None,
+                    "stations_with_data": 0,
+                    "total_rows": 0,
+                }
+
+    # 3. ECMWF Probability (cews_forecast_snapshot)
+    prob_periods = get_probability_periods_list()
+    prob_vintages_by_res: Dict[str, List[Dict[str, Any]]] = {"DASARIAN": [], "BULANAN": []}
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT forecast_resolution,
+                           DATE_FORMAT(issue_date, '%Y-%m-%d') AS issue_date,
+                           COUNT(DISTINCT station_id) AS stations_count,
+                           COUNT(DISTINCT CONCAT(target_year, '-', LPAD(target_month, 2, '0'), '-', target_dasarian)) AS periods_count
+                    FROM cews_forecast_snapshot
+                    GROUP BY forecast_resolution, issue_date
+                    ORDER BY issue_date DESC
+                """)
+                for r in cur.fetchall():
+                    res_k = str(r["forecast_resolution"]).upper()
+                    if res_k in prob_vintages_by_res:
+                        prob_vintages_by_res[res_k].append({
+                            "issue_date": r["issue_date"],
+                            "stations_count": int(r["stations_count"] or 0),
+                            "periods_count": int(r["periods_count"] or 0),
+                        })
+    except Exception:
+        pass
+
+    # 4. ECMWF Deterministic (cews_forecast_deterministic_snapshot, active is_voided = 0 only)
+    det_periods = get_deterministic_periods_list()
+    det_vintages_das = get_deterministic_vintages(resolution="DASARIAN", include_voided=False).get("vintages", [])
+    det_vintages_bul = get_deterministic_vintages(resolution="BULANAN", include_voided=False).get("vintages", [])
+
+    det_period_vintages: Dict[str, List[str]] = {}
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT forecast_resolution, target_year, target_month, target_dasarian,
+                           GROUP_CONCAT(DISTINCT DATE_FORMAT(issue_date, '%Y-%m-%d') ORDER BY issue_date DESC) AS vintages
+                    FROM cews_forecast_deterministic_snapshot
+                    WHERE is_voided = 0
+                    GROUP BY forecast_resolution, target_year, target_month, target_dasarian
+                """)
+                for r in cur.fetchall():
+                    res_k = str(r["forecast_resolution"]).upper()
+                    y, m, d = int(r["target_year"]), int(r["target_month"]), int(r["target_dasarian"])
+                    pid = f"{y}-{m:02d}-das{d}" if res_k == "DASARIAN" else f"{y}-{m:02d}"
+                    det_period_vintages[f"{res_k}:{pid}"] = str(r["vintages"]).split(",") if r["vintages"] else []
+    except Exception:
+        pass
+
+    for p in det_periods.get("dasarian", []):
+        p["available_vintages"] = det_period_vintages.get(f"DASARIAN:{p['period_id']}", [])
+    for p in det_periods.get("bulanan", []):
+        p["available_vintages"] = det_period_vintages.get(f"BULANAN:{p['period_id']}", [])
+
+    return {
+        "rainfall": rainfall_meta,
+        "spi": spi_matrix,
+        "ecmwf": {
+            "probability": {
+                "DASARIAN": {
+                    "available": len(prob_periods.get("dasarian", [])) > 0,
+                    "periods": prob_periods.get("dasarian", []),
+                    "vintages": prob_vintages_by_res["DASARIAN"],
+                },
+                "BULANAN": {
+                    "available": len(prob_periods.get("bulanan", [])) > 0,
+                    "periods": prob_periods.get("bulanan", []),
+                    "vintages": prob_vintages_by_res["BULANAN"],
+                },
+            },
+            "deterministic": {
+                "DASARIAN": {
+                    "available": len(det_periods.get("dasarian", [])) > 0,
+                    "periods": det_periods.get("dasarian", []),
+                    "vintages": det_vintages_das,
+                },
+                "BULANAN": {
+                    "available": len(det_periods.get("bulanan", [])) > 0,
+                    "periods": det_periods.get("bulanan", []),
+                    "vintages": det_vintages_bul,
+                },
+            },
+        },
     }

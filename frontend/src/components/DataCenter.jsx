@@ -7,14 +7,18 @@ import {
   Info, 
   FileSpreadsheet,
   Database,
-  UploadCloud
+  UploadCloud,
+  ShieldAlert,
+  CloudRain
 } from 'lucide-react';
 import DailyRainfallTable from './DailyRainfallTable';
 import SpiDataTable from './SpiDataTable';
 import ProbabilityDataTable from './ProbabilityDataTable';
+import DeterministicForecastTable from './DeterministicForecastTable';
 import StationInfoModal from './StationInfoModal';
 import DataDownloadModal from './DataDownloadModal';
 import DataIngestionModal from './DataIngestionModal';
+import EcmwfForecastInputModal from './EcmwfForecastInputModal';
 import RainfallInputModal from './RainfallInputModal';
 import SpiGeneratorModal from './SpiGeneratorModal';
 import OperationalDataManager from './OperationalDataManager';
@@ -22,9 +26,16 @@ import ErrorBoundary from './ErrorBoundary';
 
 export default function DataCenter({ initialSubTab = 'rainfall', activePeriodId = '2026-09-das2', onDataIngestionCommitted }) {
   const [activeSubTab, setActiveSubTab] = useState(initialSubTab); // 'rainfall' | 'spi' | 'probability' | 'management'
+  // 2-Level Forecast Hierarchy: Level 1 = Resolusi (DASARIAN | BULANAN), Level 2 = Jenis Data (PROBABILITAS | DETERMINISTIK)
+  const [forecastResolution, setForecastResolution] = useState(
+    activePeriodId && !activePeriodId.includes('das') ? 'BULANAN' : 'DASARIAN'
+  );
+  const [forecastDataType, setForecastDataType] = useState('PROBABILITAS');
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [showIngestionModal, setShowIngestionModal] = useState(false);
+  const [showEcmwfModal, setShowEcmwfModal] = useState(false);
+  const [ecmwfModalResolution, setEcmwfModalResolution] = useState('DASARIAN');
   const [showRainfallInputModal, setShowRainfallInputModal] = useState(false);
   const [showGeneratorModal, setShowGeneratorModal] = useState(false);
   const [generatorContext, setGeneratorContext] = useState({ resolution: 'DASARIAN', timescale: 30 });
@@ -49,6 +60,11 @@ export default function DataCenter({ initialSubTab = 'rainfall', activePeriodId 
   const handleOpenIngestion = (category = 'AUTO_DETECT') => {
     if (category === 'CURAH_HUJAN') {
       setShowRainfallInputModal(true);
+      return;
+    }
+    if (category === 'PROBABILITAS_DASARIAN' || category === 'PROBABILITAS_BULANAN') {
+      setEcmwfModalResolution(category === 'PROBABILITAS_BULANAN' ? 'BULANAN' : 'DASARIAN');
+      setShowEcmwfModal(true);
       return;
     }
     setIngestionCategory(category);
@@ -85,7 +101,7 @@ export default function DataCenter({ initialSubTab = 'rainfall', activePeriodId 
             <span className="badge-dataset-count">57 Stasiun Master Kepri</span>
           </div>
           <p className="data-center-subheading">
-            Akses terpadu terhadap observasi curah hujan harian (MariaDB), 5 skala SPI (Parquet), dan multi-vintage prakiraan probabilitas iklim ECMWF
+            Akses terpadu observasi curah hujan harian (MariaDB), 5 skala SPI (Parquet), serta multi-vintage prakiraan probabilistik (%) dan deterministik (mm) ECMWF
           </p>
         </div>
 
@@ -104,12 +120,19 @@ export default function DataCenter({ initialSubTab = 'rainfall', activePeriodId 
             type="button"
             className="btn-action-download-global"
             onClick={() => handleOpenDownload(
-              activeSubTab === 'rainfall' ? 'RAINFALL' : activeSubTab === 'spi' ? 'SPI' : 'PROBABILITY'
+              activeSubTab === 'rainfall'
+                ? 'RAINFALL'
+                : activeSubTab === 'spi'
+                  ? 'SPI'
+                  : 'ECMWF',
+              activeSubTab === 'probability'
+                ? { ecmwfResolution: forecastResolution, ecmwfDataType: forecastDataType }
+                : {}
             )}
-            title="Buka pusat unduhan resmi lintas dataset (CH, SPI, Probabilitas)"
+            title="Buka Pusat Unduh Data DSS-PIK (Curah Hujan, SPI, Prakiraan ECMWF)"
           >
             <Download size={15} />
-            <span>Unduh Semua Dataset</span>
+            <span>Pusat Unduh Data</span>
           </button>
         </div>
       </div>
@@ -146,7 +169,7 @@ export default function DataCenter({ initialSubTab = 'rainfall', activePeriodId 
           aria-selected={activeSubTab === 'probability'}
         >
           <Percent size={16} />
-          <span>Data Probabilitas</span>
+          <span>Data Probabilitas &amp; Deterministik</span>
         </button>
 
         <button
@@ -188,14 +211,142 @@ export default function DataCenter({ initialSubTab = 'rainfall', activePeriodId 
         )}
 
         {activeSubTab === 'probability' && (
-          <div className="data-panel-fade-in">
-            <ProbabilityDataTable
-              key={`prob-${refreshKey}`}
-              activePeriodId={activePeriodId}
-              onOpenDownload={handleOpenDownload}
-              onOpenIngestion={handleOpenIngestion}
-              onOpenManagement={handleOpenManagement}
-            />
+          <div className="data-panel-fade-in ecmwf-hub-stack">
+            {/* 1. Unified Page Header: Data Probabilitas & Deterministik */}
+            <div className="prob-v2-header">
+              <div className="prob-v2-title-group">
+                <div className="prob-v2-icon-box">
+                  {forecastDataType === 'DETERMINISTIK' ? <CloudRain size={20} /> : <Percent size={20} />}
+                </div>
+                <div>
+                  <div className="prob-v2-title-row">
+                    <h2 className="prob-v2-title">Data Probabilitas &amp; Deterministik</h2>
+                    <span className="prob-v2-res-pill">{forecastResolution}</span>
+                    <span className="prob-v2-res-pill">
+                      {forecastDataType === 'DETERMINISTIK' ? 'DETERMINISTIK (MM)' : 'PROBABILITAS (%)'}
+                    </span>
+                  </div>
+                  <p className="prob-v2-desc">
+                    Pengelolaan multi-vintage prakiraan probabilistik (%) dan deterministik (mm) ECMWF untuk 57 pos pengamatan Kepulauan Riau.
+                  </p>
+                </div>
+              </div>
+
+              <div className="prob-v2-header-right">
+                <div className="prob-v2-actions">
+                  <button
+                    type="button"
+                    className="prob-v2-btn-primary"
+                    onClick={() => handleOpenIngestion('PROBABILITAS_DASARIAN')}
+                    title="Unggah workbook ECMWF (pilih resolusi Dasarian atau Bulanan di dalam popup)"
+                  >
+                    <UploadCloud size={15} />
+                    <span>Input / Pembaruan Data</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="prob-v2-btn-secondary"
+                    onClick={() =>
+                      handleOpenManagement(
+                        'CORRECTIONS',
+                        forecastDataType === 'DETERMINISTIK' ? 'ENSMEAN' : 'PROBABILITAS'
+                      )
+                    }
+                    title="Buka panel Kelola Vintage ECMWF (Pembatalan & Aktifkan Kembali Vintage)"
+                  >
+                    <ShieldAlert size={14} className="text-rose-600" />
+                    <span>Kelola Vintage</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. Two-Level Primary Filter Hierarchy: Level 1 Resolusi -> Level 2 Jenis Data */}
+            <div className="ecmwf-hierarchy-card">
+              <div className="ecmwf-hierarchy-levels">
+                {/* TINGKAT 1 — RESOLUSI PRAKIRAAN */}
+                <div className="ecmwf-level-group">
+                  <span className="ecmwf-level-label">Resolusi Prakiraan</span>
+                  <div className="ecmwf-level-seg" role="group" aria-label="Resolusi Prakiraan">
+                    <button
+                      type="button"
+                      className={`ecmwf-level-btn ${forecastResolution === 'DASARIAN' ? 'active' : ''}`}
+                      onClick={() => setForecastResolution('DASARIAN')}
+                      aria-pressed={forecastResolution === 'DASARIAN'}
+                    >
+                      <span>Dasarian</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`ecmwf-level-btn ${forecastResolution === 'BULANAN' ? 'active' : ''}`}
+                      onClick={() => setForecastResolution('BULANAN')}
+                      aria-pressed={forecastResolution === 'BULANAN'}
+                    >
+                      <span>Bulanan</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="ecmwf-level-divider" aria-hidden="true" />
+
+                {/* TINGKAT 2 — JENIS DATA */}
+                <div className="ecmwf-level-group">
+                  <span className="ecmwf-level-label">Jenis Data</span>
+                  <div className="ecmwf-level-seg" role="tablist" aria-label="Jenis Data Prakiraan">
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={forecastDataType === 'PROBABILITAS'}
+                      className={`ecmwf-level-btn ${forecastDataType === 'PROBABILITAS' ? 'active' : ''}`}
+                      onClick={() => setForecastDataType('PROBABILITAS')}
+                    >
+                      <span>Probabilitas</span>
+                      <span className="ecmwf-level-unit">%</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={forecastDataType === 'DETERMINISTIK'}
+                      className={`ecmwf-level-btn ${forecastDataType === 'DETERMINISTIK' ? 'active' : ''}`}
+                      onClick={() => setForecastDataType('DETERMINISTIK')}
+                    >
+                      <span>Deterministik</span>
+                      <span className="ecmwf-level-unit">mm</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="prob-v2-count-summary">
+                Mode aktif:{' '}
+                <strong>
+                  {forecastDataType === 'DETERMINISTIK' ? 'Deterministik' : 'Probabilitas'}{' '}
+                  {forecastResolution === 'BULANAN' ? 'Bulanan' : 'Dasarian'}
+                </strong>
+              </div>
+            </div>
+
+            {/* 3. Active Table View (Strictly Isolated by Jenis Data, Synchronized to Resolusi) */}
+            {forecastDataType === 'PROBABILITAS' ? (
+              <ProbabilityDataTable
+                key={`prob-${refreshKey}`}
+                activePeriodId={activePeriodId}
+                externalResolutionMode={forecastResolution}
+                embeddedMode={true}
+                onOpenDownload={handleOpenDownload}
+                onOpenIngestion={handleOpenIngestion}
+                onOpenManagement={handleOpenManagement}
+              />
+            ) : (
+              <DeterministicForecastTable
+                key={`det-${refreshKey}`}
+                resolutionMode={forecastResolution}
+                embeddedMode={true}
+                onOpenIngestion={handleOpenIngestion}
+                onOpenManagement={handleOpenManagement}
+              />
+            )}
           </div>
         )}
 
@@ -240,6 +391,23 @@ export default function DataCenter({ initialSubTab = 'rainfall', activePeriodId 
           onIngestionSuccess={(res) => {
             setRefreshKey((prev) => prev + 1);
             setSpiRefreshTrigger((prev) => prev + 1);
+            if (onDataIngestionCommitted) {
+              onDataIngestionCommitted(res);
+            }
+          }}
+        />
+      </ErrorBoundary>
+
+      <ErrorBoundary name="Input Data Prakiraan ECMWF">
+        <EcmwfForecastInputModal
+          isOpen={showEcmwfModal}
+          onClose={() => setShowEcmwfModal(false)}
+          onOpenManagement={(tab) => {
+            setShowEcmwfModal(false);
+            handleOpenManagement(tab);
+          }}
+          onSuccess={(res) => {
+            setRefreshKey((prev) => prev + 1);
             if (onDataIngestionCommitted) {
               onDataIngestionCommitted(res);
             }

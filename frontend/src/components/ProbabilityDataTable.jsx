@@ -15,10 +15,13 @@ export default function ProbabilityDataTable({
   activePeriodId = '2026-10-das3',
   onOpenIngestion,
   onOpenManagement,
+  externalResolutionMode = null,
+  onResolutionChange = null,
+  embeddedMode = false,
 }) {
   // Resolution Switch: DASARIAN vs BULANAN
   const [resolutionMode, setResolutionMode] = useState(
-    activePeriodId && !activePeriodId.includes('das') ? 'BULANAN' : 'DASARIAN'
+    externalResolutionMode || (activePeriodId && !activePeriodId.includes('das') ? 'BULANAN' : 'DASARIAN')
   );
 
   const [selectedPeriodId, setSelectedPeriodId] = useState(activePeriodId);
@@ -77,6 +80,9 @@ export default function ProbabilityDataTable({
   const handleSwitchResolution = (newRes) => {
     if (newRes !== resolutionMode) {
       setResolutionMode(newRes);
+      if (onResolutionChange) {
+        onResolutionChange(newRes);
+      }
       const targetList = newRes === 'BULANAN' ? probPeriodsData.bulanan : probPeriodsData.dasarian;
       if (targetList && targetList.length > 0) {
         setSelectedPeriodId(targetList[0].period_id);
@@ -86,6 +92,23 @@ export default function ProbabilityDataTable({
       setSelectedIssueDate('');
     }
   };
+
+  // Sync with externalResolutionMode from 2-level Resolusi Prakiraan filter
+  useEffect(() => {
+    if (externalResolutionMode && externalResolutionMode !== resolutionMode) {
+      setResolutionMode(externalResolutionMode);
+      const targetList =
+        externalResolutionMode === 'BULANAN' ? probPeriodsData.bulanan : probPeriodsData.dasarian;
+      if (targetList && targetList.length > 0) {
+        setSelectedPeriodId(targetList[0].period_id);
+      } else {
+        setSelectedPeriodId(externalResolutionMode === 'BULANAN' ? '2026-10' : '2026-10-das3');
+      }
+      setSelectedIssueDate('');
+      setKabupatenFilter('ALL');
+      setSearchQuery('');
+    }
+  }, [externalResolutionMode]);
 
   // Sync with activePeriodId prop if changed from parent
   useEffect(() => {
@@ -207,7 +230,8 @@ export default function ProbabilityDataTable({
 
   return (
     <div className="prob-v2-page">
-      {/* 1. Compact Operational Page Header */}
+      {/* 1. Compact Operational Page Header (shown only when standalone) */}
+      {!embeddedMode && (
       <div className="prob-v2-header">
         <div className="prob-v2-title-group">
           <div className="prob-v2-icon-box">
@@ -256,19 +280,21 @@ export default function ProbabilityDataTable({
                 type="button"
                 className="prob-v2-btn-secondary"
                 onClick={() => onOpenManagement('CORRECTIONS', 'PROBABILITAS')}
-                title="Buka formulir pembatalan (void) snapshot probabilitas ECMWF"
+                title="Buka panel Kelola Vintage Probabilitas ECMWF"
               >
                 <ShieldAlert size={14} className="text-rose-600" />
-                <span>Pembatalan / Void</span>
+                <span>Kelola Vintage</span>
               </button>
             )}
           </div>
         </div>
       </div>
+      )}
 
-      {/* 2. Unified Resolution Segmented Control & Filter Bar */}
+      {/* 2. Unified Filter Bar (Resolution switch omitted when embeddedMode=true) */}
       <div className="prob-v2-controls-card">
         <div className="prob-v2-controls-top">
+          {!embeddedMode ? (
           <div className="prob-v2-seg-wrap">
             <span className="prob-v2-seg-label">Resolusi Prakiraan</span>
             <div className="prob-v2-segmented" role="group" aria-label="Resolusi Probabilitas">
@@ -292,6 +318,16 @@ export default function ProbabilityDataTable({
               </button>
             </div>
           </div>
+          ) : (
+          <div className="ecmwf-inline-title-row">
+            <h3 className="ecmwf-inline-title">Tabel Prakiraan Probabilistik ECMWF</h3>
+            <span className="ecmwf-inline-meta">Cakupan: {probRows.length || 57} Pos</span>
+            <span className="ecmwf-inline-meta font-mono">
+              <span className={`prob-v2-status-dot ${isLatestVintage ? '' : 'historic'}`} />
+              Vintage: {activeIssue || 'Tidak tersedia'}
+            </span>
+          </div>
+          )}
 
           <div className="prob-v2-count-summary">
             Menampilkan <strong>{filteredRows.length}</strong> dari <strong>{probRows.length}</strong> pos

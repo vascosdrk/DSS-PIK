@@ -33,8 +33,8 @@ const DATASET_TYPE_OPTIONS = [
   { value: 'SPI_HARIAN', label: 'SPI Harian (30D / 90D)', desc: 'File Parquet SPI resolusi harian seluruh stasiun' },
   { value: 'SPI_DASARIAN', label: 'SPI Dasarian (30D / 90D)', desc: 'File Parquet SPI resolusi dasarian (Pemicu Utama PDKM)' },
   { value: 'SPI_BULANAN', label: 'SPI Bulanan (1 Bulan)', desc: 'File Excel (.xlsx) SPI bulanan multi-sheet/multi-pos' },
-  { value: 'PROBABILITAS_DASARIAN', label: 'Probabilitas Dasarian', desc: 'File Excel (.xlsx) peluang CH dasarian Pb20, Pa150, Pa200, Pa300' },
-  { value: 'PROBABILITAS_BULANAN', label: 'Probabilitas Bulanan', desc: 'File Excel (.xlsx) peluang CH bulanan Pa300, Pa400, Pa500' },
+  { value: 'PROBABILITAS_DASARIAN', label: 'ECMWF Dasarian (Probabilitas & Deterministik)', desc: '3 workbook (.xlsx) per penerbitan (1 release_group_id): membaca Probabilitas (%) & Deterministik (mm)' },
+  { value: 'PROBABILITAS_BULANAN', label: 'ECMWF Bulanan (Probabilitas & Deterministik)', desc: '1 workbook (.xlsx) bulan dinamis: membaca Probabilitas (%) & Deterministik (mm)' },
 ];
 
 export default function DataIngestionModal({
@@ -65,6 +65,7 @@ export default function DataIngestionModal({
   const [diffFilterStatus, setDiffFilterStatus] = useState('ALL');
   const [diffFilterRegency, setDiffFilterRegency] = useState('ALL');
   const [diffFilterPeriod, setDiffFilterPeriod] = useState('ALL');
+  const [diffProductTab, setDiffProductTab] = useState('PROB'); // 'PROB' | 'ENSMEAN'
 
   // Commit State
   const [operatorName, setOperatorName] = useState('OPERATOR_BMKG');
@@ -150,17 +151,31 @@ export default function DataIngestionModal({
       regencyCounts: s.regency_counts || {},
       stationGaps: s.station_gaps || [],
       countsByStatus: s.counts_by_status || {},
-      forecastIssueDate: s.forecast_issue_date || null,
-      forecastType: s.forecast_type || null,
-      stationMappingSummary: s.station_mapping_summary || null,
+      forecastIssueDate: previewData.forecast_issue_date || s.forecast_issue_date || null,
+      forecastType: s.forecast_type || previewData.data_type || null,
+      forecastResolution: previewData.forecast_resolution || null,
+      releaseGroupId: previewData.release_group_id || s.release_group_id || null,
+      filesCount: s.files_count ?? (Array.isArray(previewData.filenames) ? previewData.filenames.length : 1),
+      filenames: previewData.filenames || s.filenames || (previewData.filename ? [previewData.filename] : []),
+      deterministicSummary: s.deterministic_summary || null,
+      ensmeanColumnResolution: previewData.ensmean_column_resolution || null,
+      warnings: previewData.warnings || s.warnings || [],
+      hasAdjustConflicts: Boolean(previewData.has_adjust_conflicts || s.has_adjust_conflicts),
+      isIncompleteDasarianRelease:
+        (previewData.data_type === 'PROBABILITAS_DASARIAN' || datasetType === 'PROBABILITAS_DASARIAN') &&
+        Array.isArray(previewData.filenames) &&
+        previewData.filenames.length > 0 &&
+        previewData.filenames.length !== 3,
+      stationMappingSummary: previewData.station_mapping_summary || s.station_mapping_summary || null,
       unmappedExternalStations: s.unmapped_external_stations || [],
       duplicateStations: s.duplicate_stations || [],
       diffList: (previewData.diff_samples && previewData.diff_samples.length > 0)
         ? previewData.diff_samples
         : (previewData.preview_items || []),
+      detDiffList: previewData.deterministic_diff_samples || [],
       anomalies: previewData.anomalies || [],
     };
-  }, [previewData]);
+  }, [previewData, datasetType]);
 
   // Filtered diff samples list (period-aware & filterable)
   const filteredDiffList = useMemo(() => {
@@ -475,6 +490,26 @@ export default function DataIngestionModal({
                     </div>
                   )}
 
+                  {datasetType === 'PROBABILITAS_DASARIAN' && (
+                    <div className="bg-sky-50 border border-sky-200 rounded-lg p-3 text-xs text-sky-900 mb-3 flex items-start gap-2">
+                      <Info size={15} className="text-sky-700 shrink-0 mt-0.5" />
+                      <div>
+                        <strong>Aturan Penerbitan ECMWF Dasarian (3 Workbook = 1 Release Group):</strong>{' '}
+                        Anda dapat melakukan pratinjau 1–3 berkas, namun <strong>penyimpanan (commit) penerbitan dasarian lengkap mewajibkan 3 workbook valid</strong> dengan <code>issue_date</code> identik dan tanpa konflik target. Sistem otomatis membaca data <strong>Probabilitas (%)</strong> sekaligus <strong>Deterministik (mm)</strong> dari ketiga workbook tersebut.
+                      </div>
+                    </div>
+                  )}
+
+                  {datasetType === 'PROBABILITAS_BULANAN' && (
+                    <div className="bg-sky-50 border border-sky-200 rounded-lg p-3 text-xs text-sky-900 mb-3 flex items-start gap-2">
+                      <Info size={15} className="text-sky-700 shrink-0 mt-0.5" />
+                      <div>
+                        <strong>Aturan Penerbitan ECMWF Bulanan:</strong>{' '}
+                        Unggah 1 workbook bulanan (.xlsx) dengan periode bulan dinamis. Sistem otomatis membaca data <strong>Probabilitas (%)</strong> dan <strong>Deterministik (mm)</strong> dari berkas yang sama, memprioritaskan kolom <code>Adjust</code>, serta mengabaikan kolom non-prakiraan (analisis/obs).
+                      </div>
+                    </div>
+                  )}
+
                   <div className="ingestion-section-block">
                     <label className="section-block-label">
                       <UploadCloud size={14} className="inline-icon text-slate-500" />
@@ -622,6 +657,125 @@ export default function DataIngestionModal({
                       </div>
                     )}
                   </div>
+
+                  {/* Unified ECMWF Probabilitas & ENSMEAN Summary Panel */}
+                  {(previewSummary.deterministicSummary || previewSummary.releaseGroupId || previewSummary.warnings?.length > 0) && (
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs mb-3 space-y-2.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200">
+                        <div className="flex items-center gap-2 font-bold text-slate-800">
+                          <Layers size={15} className="text-sky-700" />
+                          <span>Ringkasan Terpadu ECMWF (Probabilitas &amp; Deterministik)</span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5 font-mono text-[11px]">
+                          {previewSummary.forecastIssueDate && (
+                            <span className="px-2 py-0.5 rounded bg-sky-100 text-sky-900 font-semibold">
+                              Issue: {previewSummary.forecastIssueDate}
+                            </span>
+                          )}
+                          {previewSummary.forecastResolution && (
+                            <span className="px-2 py-0.5 rounded bg-indigo-100 text-indigo-900 font-semibold">
+                              {previewSummary.forecastResolution}
+                            </span>
+                          )}
+                          {previewSummary.releaseGroupId && (
+                            <span className="px-2 py-0.5 rounded bg-slate-200 text-slate-800">
+                              Group: {previewSummary.releaseGroupId} ({previewSummary.filesCount} berkas)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {previewSummary.deterministicSummary && (
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-[11px]">
+                          <div className="bg-white p-2 rounded border border-slate-200">
+                            <span className="text-slate-500 block">Deterministik Total:</span>
+                            <span className="font-mono font-bold text-slate-900">
+                              {previewSummary.deterministicSummary.total_records ?? 0} baris
+                            </span>
+                          </div>
+                          <div className="bg-white p-2 rounded border border-emerald-200">
+                            <span className="text-emerald-700 block">Deterministik Baru:</span>
+                            <span className="font-mono font-bold text-emerald-700">
+                              +{(previewSummary.deterministicSummary.new_records ?? 0) + (previewSummary.deterministicSummary.new_vintage_records ?? 0)}
+                            </span>
+                          </div>
+                          <div className="bg-white p-2 rounded border border-amber-200">
+                            <span className="text-amber-700 block">Deterministik Update:</span>
+                            <span className="font-mono font-bold text-amber-700">
+                              {previewSummary.deterministicSummary.updated_records ?? 0}
+                            </span>
+                          </div>
+                          <div className="bg-white p-2 rounded border border-sky-200">
+                            <span className="text-sky-700 block">Deterministik Reaktivasi:</span>
+                            <span className="font-mono font-bold text-sky-700">
+                              {previewSummary.deterministicSummary.reactivated_records ?? 0}
+                            </span>
+                          </div>
+                          <div className="bg-white p-2 rounded border border-slate-200">
+                            <span className="text-slate-500 block">Deterministik Identik:</span>
+                            <span className="font-mono font-bold text-slate-600">
+                              {previewSummary.deterministicSummary.identical_records ?? 0}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {previewSummary.deterministicSummary?.adjusted_columns_used?.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                          <span className="font-semibold text-emerald-800">Kolom ADJUSTED Diprioritaskan:</span>
+                          {previewSummary.deterministicSummary.adjusted_columns_used.map((col, idx) => (
+                            <span key={idx} className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-mono border border-emerald-200">
+                              {col}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {previewSummary.deterministicSummary?.ignored_non_forecast_columns?.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                          <span className="font-semibold text-slate-600">IGNORED NON-FORECAST COLUMN:</span>
+                          {previewSummary.deterministicSummary.ignored_non_forecast_columns.map((col, idx) => (
+                            <span key={idx} className="px-2 py-0.5 rounded bg-slate-200 text-slate-700 font-mono">
+                              {typeof col === 'string' ? col : (col.header || col.source_column || JSON.stringify(col))}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {previewSummary.hasAdjustConflicts && (
+                        <div className="p-2.5 rounded bg-rose-50 border border-rose-300 text-rose-900 flex items-start gap-2">
+                          <AlertCircle size={15} className="text-rose-600 shrink-0 mt-0.5" />
+                          <div>
+                            <strong>Konflik Kolom Adjust Terdeteksi — Commit Diblokir:</strong> Terdapat lebih dari satu kandidat kolom <code>Adjust</code> untuk target periode yang sama. Klarifikasi header workbook terlebih dahulu.
+                          </div>
+                        </div>
+                      )}
+
+                      {previewSummary.isIncompleteDasarianRelease && (
+                        <div className="p-2.5 rounded bg-amber-50 border border-amber-300 text-amber-900 flex items-start gap-2">
+                          <AlertTriangle size={15} className="text-amber-600 shrink-0 mt-0.5" />
+                          <div>
+                            <strong>Penerbitan Dasarian Belum Lengkap ({previewSummary.filesCount}/3 berkas):</strong>{' '}
+                            Pratinjau diizinkan untuk 1–3 berkas, tetapi <strong>Commit memerlukan tepat 3 workbook dasarian valid</strong> (tidak diperbolehkan partial release). Kembali ke Langkah 1 untuk melengkapi ketiga berkas.
+                          </div>
+                        </div>
+                      )}
+
+                      {previewSummary.warnings?.length > 0 && (
+                        <div className="p-2.5 rounded bg-amber-50 border border-amber-200 text-amber-900">
+                          <div className="font-semibold mb-1 flex items-center gap-1.5">
+                            <AlertTriangle size={14} className="text-amber-600" />
+                            <span>Peringatan &amp; Pemeriksaan Cakupan Sheet ({previewSummary.warnings.length}):</span>
+                          </div>
+                          <ul className="space-y-0.5 pl-4 list-disc text-[11px]">
+                            {previewSummary.warnings.map((w, i) => (
+                              <li key={i}>{w}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Station Mapping Validation Summary (Authoritative Metadata Check) */}
                   {previewSummary.stationMappingSummary && (
@@ -850,9 +1004,37 @@ export default function DataIngestionModal({
                   {/* Diff Table with Filters */}
                   <div className="preview-sample-section">
                     <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
-                      <h5 className="text-xs font-semibold text-slate-700">
-                        Pratinjau Diff Data ({filteredDiffList.length} baris ditampilkan):
-                      </h5>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h5 className="text-xs font-semibold text-slate-700">
+                          Pratinjau Diff Data ({diffProductTab === 'ENSMEAN' ? previewSummary.detDiffList.length : filteredDiffList.length} baris ditampilkan):
+                        </h5>
+                        {previewSummary.detDiffList.length > 0 && (
+                          <div className="inline-flex rounded-md border border-slate-300 overflow-hidden text-[11px]">
+                            <button
+                              type="button"
+                              onClick={() => setDiffProductTab('PROB')}
+                              className={`px-2.5 py-1 font-semibold transition ${
+                                diffProductTab === 'PROB'
+                                  ? 'bg-slate-800 text-white'
+                                  : 'bg-white text-slate-700 hover:bg-slate-50'
+                              }`}
+                            >
+                              Probabilitas ({filteredDiffList.length})
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDiffProductTab('ENSMEAN')}
+                              className={`px-2.5 py-1 font-semibold transition ${
+                                diffProductTab === 'ENSMEAN'
+                                  ? 'bg-sky-700 text-white'
+                                  : 'bg-white text-slate-700 hover:bg-slate-50'
+                              }`}
+                            >
+                              Deterministik mm ({previewSummary.detDiffList.length})
+                            </button>
+                          </div>
+                        )}
+                      </div>
                       <div className="flex-align gap-2 flex-wrap">
                         {previewSummary.periodsDetected.length > 1 && (
                           <div className="flex-align gap-1 text-xs">
@@ -899,6 +1081,53 @@ export default function DataIngestionModal({
                     </div>
 
                     <div className="table-responsive-wrapper max-h-56">
+                      {diffProductTab === 'ENSMEAN' && previewSummary.detDiffList.length > 0 ? (
+                        <table className="preview-diff-table">
+                          <thead>
+                            <tr>
+                              <th>Issue Date</th>
+                              <th>Target Period</th>
+                              <th>ID Pos</th>
+                              <th>Nama Pos</th>
+                              <th className="text-right">Curah Hujan (mm)</th>
+                              <th className="text-center">Status Kolom</th>
+                              <th>Kolom Sumber</th>
+                              <th className="text-center">Status Diff</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {previewSummary.detDiffList.slice(0, 35).map((row, rIdx) => {
+                              const st = row.change_type || 'NEW';
+                              return (
+                                <tr key={rIdx}>
+                                  <td className="font-mono text-xs">{row.issue_date || '—'}</td>
+                                  <td className="font-mono text-xs font-semibold text-sky-700">{row.period_id || row.target_period || '—'}</td>
+                                  <td className="font-mono text-xs font-semibold">{row.station_id || '—'}</td>
+                                  <td className="text-xs truncate max-w-xs">{row.station_name || '—'}</td>
+                                  <td className="text-right font-mono text-xs font-bold text-slate-900">
+                                    {row.value_mm !== null && row.value_mm !== undefined ? `${Number(row.value_mm).toFixed(1)} mm` : '—'}
+                                  </td>
+                                  <td className="text-center">
+                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                      row.adjustment_status === 'ADJUSTED'
+                                        ? 'bg-emerald-100 text-emerald-800'
+                                        : 'bg-sky-100 text-sky-800'
+                                    }`}>
+                                      {row.adjustment_status || 'REGULAR'}
+                                    </span>
+                                  </td>
+                                  <td className="font-mono text-[11px] text-slate-600">{row.source_column || '—'}</td>
+                                  <td className="text-center">
+                                    <span className={`badge-diff-status status-${String(st).toLowerCase()}`}>
+                                      {st}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      ) : (
                       <table className="preview-diff-table">
                         <thead>
                           {previewData?.data_type?.includes('PROBABILITAS') || datasetType?.includes('PROBABILITAS') ? (
@@ -1049,6 +1278,7 @@ export default function DataIngestionModal({
                           )}
                         </tbody>
                       </table>
+                      )}
                     </div>
                   </div>
 
@@ -1141,7 +1371,13 @@ export default function DataIngestionModal({
                       type="button"
                       className="btn-wizard-commit"
                       onClick={handleCommitIngestion}
-                      disabled={!confirmCheckbox || commitLoading || (selectedPeriods.length === 0 && previewSummary.periodsDetected.length > 0)}
+                      disabled={
+                        !confirmCheckbox ||
+                        commitLoading ||
+                        previewSummary.hasAdjustConflicts ||
+                        previewSummary.isIncompleteDasarianRelease ||
+                        (selectedPeriods.length === 0 && previewSummary.periodsDetected.length > 0)
+                      }
                     >
                       {commitLoading ? (
                         <>

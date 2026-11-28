@@ -2447,6 +2447,268 @@ def download_probability_endpoint(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Gagal mengekspor data probabilitas: {e}")
 
 
+# ==============================================================================
+# PHASE 3 — DETERMINISTIC FORECAST (ENSMEAN) API & MULTI-VINTAGE MANAGEMENT
+# ==============================================================================
+from pydantic import BaseModel
+
+
+class DeterministicVoidRequest(BaseModel):
+    issue_date: str
+    forecast_resolution: str
+    reason: str
+    target_period: Optional[str] = None
+    station_id: Optional[str] = None
+    batch_id: Optional[str] = None
+    operator: Optional[str] = "OPERATOR_BMKG"
+
+
+@app.get(
+    "/api/v1/forecast/deterministic/periods",
+    tags=["Deterministic Forecast (ENSMEAN)"],
+    summary="List available target periods for ECMWF ENSMEAN (Dasarian & Bulanan)",
+)
+def get_deterministic_periods_endpoint():
+    from backend.ecmwf_forecast_service import get_deterministic_periods_list
+    try:
+        return get_deterministic_periods_list()
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Gagal memuat daftar periode ENSMEAN: {e}")
+
+
+@app.get(
+    "/api/v1/forecast/deterministic/data",
+    tags=["Deterministic Forecast (ENSMEAN)"],
+    summary="Get cutoff-aware ECMWF ENSMEAN deterministic rainfall forecast (mm)",
+)
+def get_deterministic_data_endpoint(
+    period_id: str = Query(..., description="Target period ID e.g. 2026-11-das1 or 2026-11"),
+    resolution: Optional[str] = Query(None, description="Optional resolution check: DASARIAN or BULANAN"),
+    issue_date: Optional[str] = Query(None, description="Specific vintage issue_date (YYYY-MM-DD)"),
+    cutoff_date: Optional[str] = Query(None, description="Evaluation cutoff date (YYYY-MM-DD); only issue_date <= cutoff_date selected"),
+    station_id: Optional[str] = Query(None, description="Filter by single station_id"),
+    kabupaten: Optional[str] = Query(None, description="Filter by kabupaten/regency name"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(60, ge=5, le=100),
+):
+    from backend.ecmwf_forecast_service import get_deterministic_forecast_data
+    try:
+        return get_deterministic_forecast_data(
+            period_id=period_id,
+            resolution=resolution,
+            issue_date=issue_date,
+            cutoff_date=cutoff_date,
+            station_id=station_id,
+            kabupaten=kabupaten,
+            page=page,
+            page_size=page_size,
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Gagal memuat data ENSMEAN: {e}")
+
+
+@app.get(
+    "/api/v1/forecast/deterministic/vintages",
+    tags=["Deterministic Forecast (ENSMEAN)"],
+    summary="List available ENSMEAN vintages with cutoff-aware filtering",
+)
+def get_deterministic_vintages_endpoint(
+    resolution: Optional[str] = Query(None, description="DASARIAN or BULANAN"),
+    period_id: Optional[str] = Query(None, description="Optional target period filter"),
+    cutoff_date: Optional[str] = Query(None, description="Maximum issue_date (YYYY-MM-DD)"),
+    include_voided: bool = Query(False, description="Include soft-voided records in counts"),
+):
+    from backend.ecmwf_forecast_service import get_deterministic_vintages
+    try:
+        return get_deterministic_vintages(
+            resolution=resolution,
+            period_id=period_id,
+            cutoff_date=cutoff_date,
+            include_voided=include_voided,
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Gagal memuat daftar vintage ENSMEAN: {e}")
+
+
+@app.get(
+    "/api/v1/forecast/deterministic/vintages/{issue_date}",
+    tags=["Deterministic Forecast (ENSMEAN)"],
+    summary="Get detailed target breakdown for a single ENSMEAN vintage",
+)
+def get_deterministic_vintage_detail_endpoint(
+    issue_date: str,
+    resolution: Optional[str] = Query(None, description="DASARIAN or BULANAN"),
+    period_id: Optional[str] = Query(None, description="Optional target period filter"),
+    include_voided: bool = Query(False),
+):
+    from backend.ecmwf_forecast_service import get_deterministic_vintage_detail
+    try:
+        return get_deterministic_vintage_detail(
+            issue_date=issue_date,
+            resolution=resolution,
+            period_id=period_id,
+            include_voided=include_voided,
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Gagal memuat detail vintage ENSMEAN: {e}")
+
+
+@app.get(
+    "/api/v1/forecast/deterministic/completeness",
+    tags=["Deterministic Forecast (ENSMEAN)"],
+    summary="Get ENSMEAN station completeness metrics overall and per regency",
+)
+def get_deterministic_completeness_endpoint(
+    period_id: str = Query(..., description="Target period ID"),
+    resolution: Optional[str] = Query(None),
+    issue_date: Optional[str] = Query(None),
+    cutoff_date: Optional[str] = Query(None),
+):
+    from backend.ecmwf_forecast_service import get_deterministic_completeness
+    try:
+        return get_deterministic_completeness(
+            period_id=period_id,
+            resolution=resolution,
+            issue_date=issue_date,
+            cutoff_date=cutoff_date,
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Gagal memuat kelengkapan data ENSMEAN: {e}")
+
+
+@app.get(
+    "/api/v1/forecast/deterministic/history",
+    tags=["Deterministic Forecast (ENSMEAN)"],
+    summary="Get ENSMEAN ingestion, void, and reactivation audit history",
+)
+def get_deterministic_history_endpoint(
+    limit: int = Query(50, ge=1, le=200),
+    issue_date: Optional[str] = Query(None),
+    resolution: Optional[str] = Query(None),
+):
+    from backend.ecmwf_forecast_service import get_deterministic_history
+    try:
+        return get_deterministic_history(limit=limit, issue_date=issue_date, resolution=resolution)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Gagal memuat riwayat ENSMEAN: {e}")
+
+
+@app.get(
+    "/api/v1/export/availability",
+    tags=["Data Export"],
+    summary="Get live actual data availability across Rainfall, SPI, and ECMWF datasets",
+)
+def get_export_availability_endpoint():
+    from backend.data_service import get_export_availability_metadata
+    try:
+        return get_export_availability_metadata()
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Gagal memuat metadata ketersediaan ekspor: {e}",
+        )
+
+
+@app.get(
+    "/api/v1/forecast/deterministic/download",
+    tags=["Deterministic Forecast (ENSMEAN)"],
+    summary="Export ENSMEAN deterministic forecast data in CSV or XLSX format",
+)
+def download_deterministic_endpoint(
+    period_id: str = Query(..., description="Target period ID"),
+    file_format: Optional[str] = Query(None, description="csv or xlsx"),
+    format: Optional[str] = Query(None, description="csv or xlsx"),
+    resolution: Optional[str] = Query(None),
+    issue_date: Optional[str] = Query(None),
+    cutoff_date: Optional[str] = Query(None),
+    station_id: Optional[str] = Query(None),
+    station_ids: Optional[str] = Query(None, description="Comma-separated station IDs"),
+    kabupaten: Optional[str] = Query(None),
+):
+    from backend.ecmwf_forecast_service import export_deterministic_forecast_data
+    try:
+        fmt = (format or file_format or "csv").lower().strip()
+        stn_list = [s.strip() for s in station_ids.split(",") if s.strip()] if isinstance(station_ids, str) and station_ids.strip() else None
+        content, media_type, filename = export_deterministic_forecast_data(
+            period_id=period_id,
+            file_format=fmt,
+            resolution=resolution,
+            issue_date=issue_date,
+            cutoff_date=cutoff_date,
+            station_id=station_id,
+            station_ids=stn_list,
+            kabupaten=kabupaten,
+        )
+        return Response(
+            content=content,
+            media_type=media_type,
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Access-Control-Expose-Headers": "Content-Disposition",
+            },
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Gagal mengekspor data ENSMEAN: {e}")
+
+
+@app.post(
+    "/api/v1/ingestion/deterministic/void",
+    tags=["Deterministic Forecast (ENSMEAN)"],
+    summary="Soft-void ENSMEAN records isolated from probabilistic forecasts",
+)
+def void_deterministic_endpoint(payload: DeterministicVoidRequest, request: Request):
+    from backend.ecmwf_forecast_service import void_deterministic_forecast
+    try:
+        op = (getattr(request.state, "user", None) or {}).get("username") or payload.operator or "OPERATOR_BMKG"
+        return void_deterministic_forecast(
+            issue_date=payload.issue_date,
+            reason=payload.reason,
+            forecast_resolution=payload.forecast_resolution,
+            target_period=payload.target_period,
+            station_id=payload.station_id,
+            batch_id=payload.batch_id,
+            operator=op,
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Gagal membatalkan data ENSMEAN: {e}")
+
+
+@app.post(
+    "/api/v1/ingestion/deterministic/reactivate",
+    tags=["Deterministic Forecast (ENSMEAN)"],
+    summary="Reactivate soft-voided ENSMEAN records with full audit preservation",
+)
+def reactivate_deterministic_endpoint(payload: DeterministicVoidRequest, request: Request):
+    from backend.ecmwf_forecast_service import reactivate_deterministic_forecast
+    try:
+        op = (getattr(request.state, "user", None) or {}).get("username") or payload.operator or "OPERATOR_BMKG"
+        return reactivate_deterministic_forecast(
+            issue_date=payload.issue_date,
+            reason=payload.reason,
+            forecast_resolution=payload.forecast_resolution,
+            target_period=payload.target_period,
+            station_id=payload.station_id,
+            batch_id=payload.batch_id,
+            operator=op,
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Gagal mereaktivasi data ENSMEAN: {e}")
+
+
 @app.get(
     "/api/v1/rainfall/download",
     tags=["Rainfall Monitoring"],
@@ -2743,6 +3005,40 @@ async def preview_ingestion_file(
             return parse_spi_bulanan_excel(file_bytes, filename)
         elif detected_type in ("PROBABILITAS_DASARIAN", "PROBABILITY_DASARIAN", "PROBABILITAS_BULANAN", "PROBABILITY_BULANAN"):
             forecast_type = "PROBABILITAS_BULANAN" if "BULAN" in detected_type else "PROBABILITAS_DASARIAN"
+            if forecast_type == "PROBABILITAS_DASARIAN" and files and len(files) > 1:
+                from backend.ecmwf_forecast_service import parse_ecmwf_dasarian_release
+                files_payload = [(filename, file_bytes)]
+                for extra_f in files[1:]:
+                    files_payload.append((extra_f.filename or "uploaded_file", await extra_f.read()))
+                rel = parse_ecmwf_dasarian_release(files_payload)
+                s = rel["summary"]
+                return {
+                    "status": "SUCCESS",
+                    "data_type": rel["data_type"],
+                    "filename": rel["filename"],
+                    "staging_token": rel["staging_token"],
+                    "summary": {
+                        "total_rows": s.get("total_records", 0),
+                        "forecast_type": rel["data_type"],
+                        "forecast_resolution": rel["forecast_resolution"],
+                        "forecast_issue_date": rel["forecast_issue_date"],
+                        "release_group_id": rel["release_group_id"],
+                        "files_count": s.get("files_count", len(files_payload)),
+                        "filenames": s.get("filenames", []),
+                        "periods_detected": rel["periods_detected"],
+                        "station_mapping_summary": rel["station_mapping_summary"],
+                        "total_new": s.get("new_records", 0),
+                        "total_new_vintage": s.get("new_vintage_records", 0),
+                        "total_updated": s.get("updated_records", 0),
+                        "total_identical": s.get("identical_records", 0),
+                        "total_invalid": s.get("rejected_records", 0),
+                        "deterministic_summary": s.get("deterministic_summary", {}),
+                        "warnings": rel.get("warnings", []),
+                    },
+                    "anomalies": rel.get("anomalies", []),
+                    "diff_samples": rel.get("diff_samples", [])[:80],
+                    "preview_items": rel.get("diff_samples", [])[:50],
+                }
             return parse_probability_excel(file_bytes, filename, forecast_type=forecast_type)
         else:
             raise HTTPException(

@@ -1547,438 +1547,66 @@ def parse_probability_excel(
     forecast_type: str = "DASARIAN"
 ) -> Dict[str, Any]:
     """
-    Parses probability forecast workbook (Dasarian or Bulanan).
-    Enforces STRICT 0-100% scale without re-scaling, extracts forecast issue date,
-    accurately computes year rollover for monthly forecasts (e.g. Dec -> Jan next year),
-    isolates vintages, and returns period-aware diff preview.
+    Unified parser for ECMWF forecast workbooks (Dasarian & Bulanan).
+    Delegates to `backend.ecmwf_forecast_service.parse_ecmwf_workbook_unified` to parse
+    BOTH Probabilistic sheets (0-100%) and Deterministic EnsMean (mm, with Adjust priority
+    and non-forecast column filtering) while preserving full backward compatibility with
+    IngestionPreviewResponse and existing callers.
     """
-    wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True, read_only=True)
-    master_lookup = get_master_station_lookup()
-    add_map = get_additional_mapping_lookup()
+    from backend.ecmwf_forecast_service import parse_ecmwf_workbook_unified
 
-    # Auto-detect monthly if requested, if pa400/pa500 present, or if filename contains bulanan
-    is_monthly = ("BULAN" in forecast_type.upper()) or ("bulanan" in filename.lower()) or any(s in ["pa400", "pa500"] for s in wb.sheetnames)
-    target_type = "PROBABILITAS_BULANAN" if is_monthly else "PROBABILITAS_DASARIAN"
-
-    OPERATIONAL_PROB_PARAMS_DASARIAN = ["pb20", "pa150", "pa200", "pa300"]
-    OPERATIONAL_PROB_PARAMS_BULANAN = ["pa300", "pa400", "pa500"]
-
-    active_sheets = OPERATIONAL_PROB_PARAMS_BULANAN if is_monthly else OPERATIONAL_PROB_PARAMS_DASARIAN
-    valid_sheets = [s for s in active_sheets if s in wb.sheetnames]
-    if not valid_sheets:
-        wb.close()
-        raise ValueError("Workbook tidak memiliki sheet probabilitas operasional yang valid (pb20, pa150, pa200, pa300 / pa300, pa400, pa500).")
-
-    # Extract issue date from workbook content and filename, enforcing conflict detection
-    workbook_issue_date_str = None
-    workbook_issue_source = None
-    workbook_target_year = None
-
-    for meta_sheet in ("Sheet1", "TabelPCH", "TabelPSH"):
-        if meta_sheet in wb.sheetnames:
-            try:
-                ws_m = wb[meta_sheet]
-                for r in ws_m.iter_rows(min_row=1, max_row=5, values_only=True):
-                    for cell_v in (r or []):
-                        if cell_v is None:
-                            continue
-                        cell_s = str(cell_v).strip()
-                        m_iss = re.search(r'(?:ver_|issue[:\s]+)(\d{4})[._-](\d{2})[._-](\d{2})', cell_s, re.IGNORECASE)
-                        if m_iss and not workbook_issue_date_str:
-                            workbook_issue_date_str = f"{m_iss.group(1)}-{m_iss.group(2)}-{m_iss.group(3)}"
-                            workbook_issue_source = f"WORKBOOK_{meta_sheet}"
-                        m_yr = re.search(r'\b(20\d{2})\b', cell_s)
-                        if m_yr and not workbook_target_year:
-                            workbook_target_year = int(m_yr.group(1))
-            except Exception:
-                pass
-
-    filename_issue_date_str = None
-    issue_match = re.search(r'ver_(\d{4})[._-](\d{2})[._-](\d{2})', filename) or re.search(r'(\d{4})[._-](\d{2})[._-](\d{2})', filename)
-    if issue_match:
-        filename_issue_date_str = f"{issue_match.group(1)}-{issue_match.group(2)}-{issue_match.group(3)}"
-
-    if workbook_issue_date_str and filename_issue_date_str and workbook_issue_date_str != filename_issue_date_str:
-        wb.close()
-        raise ValueError(
-            f"Konflik metadata issue_date terdeteksi: isi workbook menyatakan '{workbook_issue_date_str}' ({workbook_issue_source}), "
-            f"sedangkan nama file menyatakan '{filename_issue_date_str}'. Harap perbaiki konsistensi berkas sebelum mengunggah."
-        )
-
-    if workbook_issue_date_str:
-        issue_date_str = workbook_issue_date_str
-        issue_date_source = workbook_issue_source
-    elif filename_issue_date_str:
-        issue_date_str = filename_issue_date_str
-        issue_date_source = "FILENAME_VERIFIED"
-    else:
-        issue_date_str = datetime.now().strftime("%Y-%m-%d")
-        issue_date_source = "FALLBACK_SYSTEM_DATE"
-
-    issue_dt = date.fromisoformat(issue_date_str)
-    issue_year = issue_dt.year
-    issue_month = issue_dt.month
-
-    ref_sheet_name = "pb20" if "pb20" in wb.sheetnames else ("pa300" if "pa300" in wb.sheetnames else ("pb50" if "pb50" in wb.sheetnames else valid_sheets[0]))
-    ws_ref = wb[ref_sheet_name]
-
-    header = [c for c in next(ws_ref.iter_rows(min_row=1, max_row=1, values_only=True))]
-    period_cols = [c for c in header[7:] if c is not None and str(c).strip() != ""]  # Starting at column 8, ignoring trailing empty header cells
-
-    # If first period col is a standalone month name (e.g. 'Sep', 'Okt', 'Januari'), enforce is_monthly
-    if period_cols and not is_monthly:
-        first_col_clean = str(period_cols[0]).strip().lower()
-        if first_col_clean in MONTH_ABBR_MAP:
-            is_monthly = True
-            target_type = "PROBABILITAS_BULANAN"
-            active_sheets = OPERATIONAL_PROB_PARAMS_BULANAN
-            valid_sheets = [s for s in active_sheets if s in wb.sheetnames]
-
-    fc_resolution = "BULANAN" if is_monthly else "DASARIAN" 
-
-    # Map station list from reference sheet with collision protection and strict master matching
-    recognized_stations = []
-    unmapped_external = []
-    duplicate_stations = []
-    station_rows = []
-    seen_sids = set()
-    total_file_rows = 0
-
-    for row_idx, row in enumerate(ws_ref.iter_rows(min_row=2, values_only=True), start=2):
-        if not row or len(row) < 7:
-            continue
-        total_file_rows += 1
-        nopos = str(row[0]).strip().upper() if row[0] is not None else ""
-        sname = str(row[1]).strip() if row[1] is not None else ""
-        norm_sname = " ".join(sname.lower().split())
-
-        # Exact matching against mapping_tambahan lookup and master_lookup
-        sid = (
-            add_map.get("pairs", {}).get((nopos, norm_sname))
-            or add_map.get("names", {}).get(norm_sname)
-            or add_map.get("nopos_unique", {}).get(nopos)
-        )
-        if not sid and nopos in master_lookup:
-            sid = nopos
-        if not sid:
-            # Check exact match with master station_name
-            for mid, minfo in master_lookup.items():
-                if minfo["station_name"].strip().lower() == norm_sname:
-                    sid = mid
-                    break
-
-        if sid and sid in master_lookup:
-            if sid in seen_sids:
-                duplicate_stations.append({
-                    "nopos": nopos,
-                    "name": sname,
-                    "station_id": sid,
-                    "row": row_idx,
-                    "reason": "Station ID sudah dipetakan pada baris sebelumnya"
-                })
-            else:
-                seen_sids.add(sid)
-                recognized_stations.append(sid)
-                station_rows.append((row_idx, sid, nopos, sname))
-        else:
-            unmapped_external.append({
-                "nopos": nopos,
-                "name": sname,
-                "row": row_idx,
-                "reason": "Pos di luar cakupan 57 stasiun master"
-            })
-
-    missing_manual_master = [
-        {"station_id": sid, "station_name": minfo["station_name"], "kabupaten": minfo["kabupaten"]}
-        for sid, minfo in master_lookup.items()
-        if not minfo["is_arg"] and sid not in seen_sids
-    ]
-
-    station_mapping_summary = {
-        "total_rows_in_file": total_file_rows,
-        "matched_stations_count": len(recognized_stations),
-        "unmapped_external_count": len(unmapped_external),
-        "duplicate_stations_count": len(duplicate_stations),
-        "missing_master_stations_count": len(missing_manual_master),
-        "unmapped_details": unmapped_external,
-        "duplicate_details": duplicate_stations,
-        "missing_master_stations": missing_manual_master,
-    }
-
-    # Detect Periods and Horizons with Year Rollover
-    periods_detected = []
-    col_period_meta = []
-
-    for idx, c in enumerate(period_cols):
-        col_str = str(c).strip()
-        t_year = issue_year
-        t_month = issue_month
-        t_das = 0 if is_monthly else 1
-        p_label = col_str
-
-        if is_monthly:
-            t_das = 0
-            c_low = col_str.lower()
-            m_num = MONTH_ABBR_MAP.get(c_low)
-            if not m_num:
-                # Try finding month in string
-                for m_k, m_v in MONTH_ABBR_MAP.items():
-                    if m_k in c_low:
-                        m_num = m_v
-                        break
-            if m_num:
-                t_month = m_num
-                # YEAR ROLLOVER LOGIC:
-                # If target month is less than issue month, it rolls over to next year!
-                if t_month < issue_month:
-                    t_year = issue_year + 1
-                else:
-                    t_year = issue_year
-                p_label = f"{INDONESIAN_MONTHS[t_month - 1]} {t_year} (Horizon {idx + 1})"
-            p_id = f"{t_year}-{t_month:02d}"
-        else:
-            # Dasarian columns like 'MeiI', 'MeiII', 'MeiIII'
-            m_match = re.search(r'^([A-Za-z]+?)(I{1,3}|1|2|3)$', col_str)
-            if m_match:
-                m_str = m_match.group(1).lower()
-                r_str = m_match.group(2).upper()
-                m_num = MONTH_ABBR_MAP.get(m_str, issue_month)
-                t_month = m_num
-                t_das = 1 if r_str == "I" else (2 if r_str == "II" else 3)
-                if t_month < issue_month:
-                    t_year = issue_year + 1
-                p_label = f"{INDONESIAN_MONTHS[t_month - 1]} {r_str} {t_year}"
-            p_id = f"{t_year}-{t_month:02d}-das{t_das}"
-
-        col_period_meta.append({
-            "col_index": 7 + idx,
-            "col_name": col_str,
-            "period_id": p_id,
-            "label": p_label,
-            "target_year": t_year,
-            "target_month": t_month,
-            "target_dasarian": t_das,
-            "horizon_index": idx + 1,
-        })
-        periods_detected.append({
-            "period_id": p_id,
-            "label": p_label,
-            "target_year": t_year,
-            "target_month": t_month,
-            "target_dasarian": t_das,
-            "horizon": f"Bulan {idx+1}" if is_monthly else f"Dasarian {idx+1}",
-            "stations_count": len(recognized_stations),
-        })
-
-    # Query existing forecast snapshot from MariaDB for diff & multi-vintage calculation
-    exact_vintage_map = {}
-    other_vintage_map = {}
-    unique_years = list(set(m["target_year"] for m in col_period_meta))
-    if unique_years:
-        try:
-            with get_db() as conn:
-                with conn.cursor() as cur:
-                    fmt_y = ",".join(["%s"] * len(unique_years))
-                    cur.execute(f"""
-                        SELECT station_id, forecast_resolution, target_year, target_month, target_dasarian, issue_date, forecast_parameter, probability_value
-                        FROM cews_forecast_snapshot
-                        WHERE target_year IN ({fmt_y}) AND forecast_resolution = %s
-                    """, unique_years + [fc_resolution])
-                    for r in cur.fetchall():
-                        r_iss = r["issue_date"].strftime("%Y-%m-%d") if hasattr(r["issue_date"], "strftime") else str(r["issue_date"])
-                        r_val = float(r["probability_value"]) if r["probability_value"] is not None else None
-                        r_res = str(r.get("forecast_resolution", fc_resolution)).strip().upper()
-                        key = (
-                            r["station_id"],
-                            r_res,
-                            r["target_year"],
-                            r["target_month"],
-                            r["target_dasarian"],
-                            r["forecast_parameter"]
-                        )
-                        if r_iss == issue_date_str:
-                            exact_vintage_map[key] = r_val
-                        else:
-                            if key not in other_vintage_map:
-                                other_vintage_map[key] = []
-                            other_vintage_map[key].append((r_iss, r_val))
-        except Exception as e:
-            logger.warning(f"Could not load existing forecast snapshot for multi-vintage diff: {e}")
-
-    # Parse all threshold sheets for all recognized stations
-    parsed_entries = []
-    anomalies = []
-    total_new = 0
-    total_new_vintage = 0
-    total_updated = 0
-    total_identical = 0
-    total_invalid = 0
-    diff_samples = []
-
-    for sheet_name in valid_sheets:
-        param_name = sheet_name.strip()
-        ws = wb[sheet_name]
-        for row_idx, sid, nopos, sname in station_rows:
-            # Fetch row values
-            row_vals = [c for c in next(ws.iter_rows(min_row=row_idx, max_row=row_idx, values_only=True))]
-            for meta in col_period_meta:
-                c_idx = meta["col_index"]
-                val = row_vals[c_idx] if c_idx < len(row_vals) else None
-                prob_val = None
-                is_rejected = False
-                if val is not None:
-                    try:
-                        f_v = float(val)
-                        # Strict 0-100% scale validation
-                        if f_v < 0 or f_v > 100:
-                            is_rejected = True
-                            total_invalid += 1
-                            anomalies.append({
-                                "station_id": sid,
-                                "station_name": sname,
-                                "sheet": sheet_name,
-                                "period_id": meta["period_id"],
-                                "raw_value": val,
-                                "reason": f"Nilai probabilitas di luar rentang 0-100% ({f_v})"
-                            })
-                            f_v = None
-                        prob_val = round(f_v, 2) if f_v is not None else None
-                    except ValueError:
-                        is_rejected = True
-                        total_invalid += 1
-                        anomalies.append({
-                            "station_id": sid,
-                            "station_name": sname,
-                            "sheet": sheet_name,
-                            "period_id": meta["period_id"],
-                            "raw_value": str(val),
-                            "reason": "Nilai non-numerik tidak valid"
-                        })
-                        prob_val = None
-
-                # Multi-vintage diff classification
-                key = (sid, fc_resolution, meta["target_year"], meta["target_month"], meta["target_dasarian"], param_name)
-                if is_rejected:
-                    change_type = "REJECTED"
-                    old_val = None
-                    diff_val = None
-                elif key in exact_vintage_map:
-                    # Same target period and exact same issue date
-                    old_val = exact_vintage_map[key]
-                    if (prob_val is not None and old_val is not None and abs(prob_val - old_val) < 1e-4) or (prob_val is None and old_val is None):
-                        change_type = "IDENTICAL"
-                        diff_val = 0.0
-                        total_identical += 1
-                    else:
-                        change_type = "UPDATED"
-                        diff_val = round(prob_val - old_val, 2) if (prob_val is not None and old_val is not None) else None
-                        total_updated += 1
-                elif key in other_vintage_map:
-                    # Same target period, but newly published vintage issue date
-                    sorted_vintages = sorted(other_vintage_map[key], key=lambda x: x[0], reverse=True)
-                    latest_prev_iss, latest_prev_val = sorted_vintages[0]
-                    change_type = "NEW VINTAGE"
-                    old_val = latest_prev_val
-                    diff_val = round(prob_val - old_val, 2) if (prob_val is not None and old_val is not None) else None
-                    total_new_vintage += 1
-                else:
-                    # Target period never before stored
-                    change_type = "NEW"
-                    old_val = None
-                    diff_val = None
-                    total_new += 1
-
-                item = {
-                    "station_id": sid,
-                    "station_name": master_lookup[sid]["station_name"],
-                    "forecast_resolution": fc_resolution,
-                    "target_year": meta["target_year"],
-                    "target_month": meta["target_month"],
-                    "target_dasarian": meta["target_dasarian"],
-                    "issue_date": issue_date_str,
-                    "forecast_issue_date": issue_date_str,
-                    "forecast_parameter": param_name,
-                    "indicator": param_name,
-                    "probability_value": prob_val,
-                    "new_value": prob_val,
-                    "old_value": old_val,
-                    "diff": diff_val,
-                    "period_id": meta["period_id"],
-                    "target_period": meta["period_id"],
-                    "period_label": meta["label"],
-                    "change_type": change_type,
-                }
-                parsed_entries.append(item)
-
-                if change_type in ("UPDATED", "NEW VINTAGE", "REJECTED"):
-                    diff_samples.append(item)
-                elif change_type == "NEW" and len(diff_samples) < 80:
-                    diff_samples.append(item)
-                elif change_type == "IDENTICAL" and len(diff_samples) < 80 and total_new == 0 and total_new_vintage == 0 and total_updated == 0:
-                    diff_samples.append(item)
-
-    wb.close()
-
-    staging_token = f"TOKEN_PROB_{uuid.uuid4().hex[:12]}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
-    _STAGING_SESSIONS[staging_token] = {
-        "data_type": target_type,
-        "filename": filename,
-        "file_sha256": hashlib.sha256(file_bytes).hexdigest(),
-        "parser_version": PARSER_VERSION,
-        "forecast_issue_date": issue_date_str,
-        "issue_date_source": issue_date_source,
-        "forecast_type": target_type,
-        "forecast_resolution": fc_resolution,
-        "entries": parsed_entries,
-        "periods_detected": periods_detected,
-        "station_mapping_summary": station_mapping_summary,
-        "created_at": datetime.now(),
-        "summary": {
-            "total_records": len(parsed_entries),
-            "total_stations_recognized": len(set(recognized_stations)),
-            "unmapped_external_count": len(unmapped_external),
-            "duplicate_stations_count": len(duplicate_stations),
-            "total_new": total_new,
-            "total_new_vintage": total_new_vintage,
-            "total_updated": total_updated,
-            "total_identical": total_identical,
-            "total_invalid": total_invalid,
-        }
-    }
+    u = parse_ecmwf_workbook_unified(
+        file_bytes=file_bytes,
+        filename=filename,
+        forecast_type=forecast_type,
+        register_session=True,
+    )
+    sess = _STAGING_SESSIONS[u["staging_token"]]
+    s = u["summary"]
+    sm = u["station_mapping_summary"] or {}
+    prob_entries = sess.get("entries", [])
+    recognized_sids = sorted({e["station_id"] for e in prob_entries})
 
     return {
         "status": "SUCCESS",
-        "data_type": target_type,
-        "filename": filename,
-        "staging_token": staging_token,
+        "data_type": u["data_type"],
+        "filename": u["filename"],
+        "staging_token": u["staging_token"],
         "summary": {
-            "total_rows": len(parsed_entries),
-            "forecast_type": target_type,
-            "forecast_resolution": fc_resolution,
-            "forecast_issue_date": issue_date_str,
-            "issue_date_source": issue_date_source,
-            "period_columns": [str(c) for c in period_cols],
-            "total_stations_recognized": len(set(recognized_stations)),
-            "total_stations_unrecognized": len(unmapped_external),
-            "stations_recognized": sorted(list(set(recognized_stations))),
-            "unmapped_external_stations": unmapped_external,
-            "duplicate_stations": duplicate_stations,
-            "station_mapping_summary": station_mapping_summary,
+            "total_rows": len(prob_entries),
+            "forecast_type": u["data_type"],
+            "forecast_resolution": u["forecast_resolution"],
+            "forecast_issue_date": u["forecast_issue_date"],
+            "issue_date_source": u["issue_date_source"],
+            "release_group_id": u["release_group_id"],
+            "period_columns": [p["period_id"] for p in u["periods_detected"]],
+            "total_stations_recognized": s.get("total_stations_recognized", len(recognized_sids)),
+            "total_stations_unrecognized": sm.get("unmapped_external_count", 0),
+            "stations_recognized": recognized_sids,
+            "unmapped_external_stations": sm.get("unmapped_details", []),
+            "duplicate_stations": sm.get("duplicate_details", []),
+            "station_mapping_summary": sm,
             "scale_verified": "0-100% (STRICT)",
-            "periods_detected": periods_detected,
-            "total_new": total_new,
-            "total_new_vintage": total_new_vintage,
-            "total_updated": total_updated,
-            "total_identical": total_identical,
-            "total_duplicate": len(duplicate_stations),
-            "total_missing": sum(1 for e in parsed_entries if e["probability_value"] is None and e["change_type"] != "REJECTED"),
+            "periods_detected": u["periods_detected"],
+            "total_new": s.get("new_records", 0),
+            "total_new_vintage": s.get("new_vintage_records", 0),
+            "total_updated": s.get("updated_records", 0),
+            "total_identical": s.get("identical_records", 0),
+            "total_duplicate": sm.get("duplicate_stations_count", 0),
+            "total_missing": sum(
+                1 for e in prob_entries
+                if e.get("probability_value") is None and e.get("change_type") != "REJECTED"
+            ),
             "total_damaged": 0,
-            "total_ambiguous": 0,
-            "total_invalid": total_invalid,
+            "total_ambiguous": sm.get("ambiguous_stations_count", 0),
+            "total_invalid": s.get("rejected_records", 0),
+            "deterministic_summary": s.get("deterministic_summary", {}),
+            "warnings": u.get("warnings", []),
+            "has_adjust_conflicts": u.get("has_adjust_conflicts", False),
         },
-        "anomalies": anomalies,
-        "diff_samples": diff_samples[:80],
-        "preview_items": parsed_entries[:50],
+        "anomalies": u.get("anomalies", []),
+        "diff_samples": u.get("diff_samples", [])[:80],
+        "preview_items": prob_entries[:50],
     }
 
 
@@ -2340,85 +1968,36 @@ def commit_ingestion_session(
             raise RuntimeError(f"SPI Bulanan parquet commit failed: {e}")
 
     elif dtype in ("PROBABILITAS_DASARIAN", "PROBABILITAS_BULANAN"):
-        fc_resolution = "BULANAN" if "BULAN" in dtype.upper() else "DASARIAN"
-        # Save snapshot into cews_forecast_snapshot
-        conn = get_raw_connection()
-        conn.autocommit = False
+        from backend.ecmwf_forecast_service import commit_ecmwf_unified_session
+
+        det_all = session.get("deterministic_entries", [])
+        if selected_periods:
+            sel_set = set(selected_periods)
+            det_to_commit = [e for e in det_all if e.get("period_id") in sel_set]
+        else:
+            det_to_commit = det_all
+
         try:
-            with conn.cursor() as cur:
-                ins_cnt = 0
-                upd_cnt = 0
-                same_cnt = 0
-
-                for e in entries_to_commit:
-                    if e.get("probability_value") is None:
-                        continue
-                    ch_type = e.get("change_type", "NEW")
-                    # If identical, skip writing to DB to guarantee true idempotency
-                    if ch_type == "IDENTICAL":
-                        same_cnt += 1
-                        continue
-
-                    cur.execute("""
-                        INSERT INTO cews_forecast_snapshot
-                        (station_id, forecast_resolution, target_year, target_month, target_dasarian, issue_date, forecast_parameter, probability_value, source_file, snapshot_timestamp)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
-                        ON DUPLICATE KEY UPDATE
-                            probability_value = VALUES(probability_value),
-                            source_file = VALUES(source_file),
-                            snapshot_timestamp = CURRENT_TIMESTAMP;
-                    """, (
-                        e["station_id"], fc_resolution, e["target_year"], e["target_month"], e["target_dasarian"],
-                        e["issue_date"], e["forecast_parameter"], e["probability_value"], fname
-                    ))
-                    if cur.rowcount == 1:
-                        ins_cnt += 1
-                    elif cur.rowcount == 2:
-                        upd_cnt += 1
-                    else:
-                        same_cnt += 1
-
-                new_total = sum(1 for e in entries_to_commit if e.get("change_type") in ("NEW", "NEW VINTAGE"))
-                updated_total = sum(1 for e in entries_to_commit if e.get("change_type") == "UPDATED")
-                identical_total = sum(1 for e in entries_to_commit if e.get("change_type") == "IDENTICAL")
-
-                audit_items = [
-                    {
-                        "station_id": e["station_id"],
-                        "issue_date": e["issue_date"],
-                        "target_year": e["target_year"],
-                        "target_month": e["target_month"],
-                        "target_dasarian": e["target_dasarian"],
-                        "forecast_parameter": e["forecast_parameter"],
-                        "probability_value": e.get("probability_value"),
-                        "old_value": e.get("old_value"),
-                        "change_type": e.get("change_type", "NEW"),
-                    }
-                    for e in entries_to_commit
-                ]
-
-                cur.execute("""
-                    INSERT INTO cews_ingestion_history
-                    (batch_id, data_type, file_name, file_sha256, target_period, total_records, new_records, updated_records, identical_records, rejected_records, parser_version, status, operator, batch_items_json)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'COMMITTED', %s, %s);
-                """, (
-                    b_id, dtype, fname, session.get("file_sha256"),
-                    json.dumps(selected_periods_list), len(entries_to_commit), new_total, updated_total, identical_total,
-                    rejected_count, PARSER_VERSION, operator, json.dumps(audit_items, default=str)
-                ))
-
-            conn.commit()
-            res["total_records"] = len(entries_to_commit)
-            res["records_added"] = new_total
-            res["records_updated"] = updated_total
-            res["records_skipped"] = identical_total
-            res["total_records"] = len(entries_to_commit)
-            res["records_added"] = ins_cnt
+            commit_stats = commit_ecmwf_unified_session(
+                session=session,
+                prob_entries_to_commit=entries_to_commit,
+                det_entries_to_commit=det_to_commit,
+                selected_periods_list=selected_periods_list,
+                batch_id=b_id,
+                operator=operator,
+                rejected_count=rejected_count,
+                allow_update_existing=explicit_update_consent,
+            )
+            res["total_records"] = len(entries_to_commit) + len(det_to_commit)
+            res["records_added"] = commit_stats["new_total"]
+            res["records_updated"] = commit_stats["updated_total"]
+            res["records_skipped"] = commit_stats["identical_total"]
+            res["prob_written"] = commit_stats["prob_written"]
+            res["det_written"] = commit_stats["det_written"]
+            res["det_reactivated"] = commit_stats["det_reactivated"]
+            res["release_group_id"] = commit_stats["release_group_id"]
         except Exception as e:
-            conn.rollback()
-            raise RuntimeError(f"Probabilitas snapshot commit failed: {e}")
-        finally:
-            conn.close()
+            raise RuntimeError(f"Probabilitas & ENSMEAN unified atomic commit failed: {e}")
 
     # Clean up staging session
     del _STAGING_SESSIONS[staging_token]
@@ -2917,25 +2496,36 @@ def cancel_ingestion_batch(batch_id: str, reason: str, operator: str = "OPERATOR
                 """, (reason, operator, batch_id))
 
     elif "PROBABILITAS" in dtype:
+        eff_res = "BULANAN" if "BULAN" in dtype.upper() else "DASARIAN"
         conn = get_raw_connection()
-        conn.autocommit = False
+        conn.autocommit(False)
+        conn.begin()
         try:
             with conn.cursor() as cur:
-                if items:
-                    for item in items:
+                # Only revert probabilistic items; strictly isolated from cews_forecast_deterministic_snapshot
+                prob_items = [
+                    it for it in (items or [])
+                    if it.get("dataset", "PROBABILITAS") == "PROBABILITAS" and it.get("forecast_parameter")
+                ]
+                if prob_items:
+                    for item in prob_items:
+                        item_res = str(item.get("forecast_resolution") or eff_res).strip().upper()
                         cur.execute("""
                             DELETE FROM cews_forecast_snapshot
-                            WHERE station_id = %s AND target_year = %s AND target_month = %s 
+                            WHERE station_id = %s AND target_year = %s AND target_month = %s
                               AND target_dasarian = %s AND issue_date = %s AND forecast_parameter = %s
+                              AND forecast_resolution = %s
                         """, (
                             item["station_id"], item["target_year"], item["target_month"],
-                            item["target_dasarian"], item["issue_date"], item["forecast_parameter"]
+                            item["target_dasarian"], item["issue_date"], item["forecast_parameter"],
+                            item_res
                         ))
                         records_reverted += cur.rowcount
                 else:
                     cur.execute("""
-                        DELETE FROM cews_forecast_snapshot WHERE source_file = %s
-                    """, (fname,))
+                        DELETE FROM cews_forecast_snapshot
+                        WHERE source_file = %s AND forecast_resolution = %s
+                    """, (fname, eff_res))
                     records_reverted += cur.rowcount
 
                 cur.execute("""

@@ -727,3 +727,235 @@
     justify-content: center;
   }
 }
+
+/* ==========================================================================
+   ECMWF 2-Level Hierarchy (Resolusi -> Jenis Data) & Deterministic Table
+   ========================================================================== */
+
+.ecmwf-hub-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ecmwf-hierarchy-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 18px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.ecmwf-hierarchy-levels {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
+.ecmwf-level-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.ecmwf-level-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #475569;
+  white-space: nowrap;
+}
+
+.ecmwf-level-divider {
+  width: 1px;
+  height: 28px;
+  background: #e2e8f0;
+  flex-shrink: 0;
+}
+
+.ecmwf-level-seg {
+  display: inline-flex;
+  align-items: center;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 3px;
+  gap: 3px;
+}
+
+.ecmwf-level-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #475569;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.ecmwf-level-btn:hover:not(.active) {
+  color: #0f172a;
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.ecmwf-level-btn.active {
+  background: #1e3a8a;
+  color: #ffffff;
+  box-shadow: 0 1px 2px rgba(30, 58, 138, 0.18);
+}
+
+.ecmwf-level-unit {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.67rem;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(15, 23, 42, 0.07);
+  color: inherit;
+}
+
+.ecmwf-level-btn.active .ecmwf-level-unit {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.ecmwf-inline-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.ecmwf-inline-title {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.ecmwf-inline-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: 6px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+@media (max-width: 767px) {
+  .ecmwf-level-divider {
+    display: none;
+  }
+  .ecmwf-level-group,
+  .ecmwf-level-seg {
+    width: 100%;
+  }
+  .ecmwf-level-btn {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
+.ensmean-val-mm {
+  display: inline-block;
+  min-width: 68px;
+  text-align: right;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.ensmean-val-unit {
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: #64748b;
+  margin-left: 3px;
+}
+
+.ensmean-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.67rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.ensmean-badge-adjusted {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+.ensmean-badge-regular {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.ensmean-badge-arg {
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #cbd5e1;
+}
+
+.ensmean-empty-state {
+  padding: 44px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 8px;
+  color: #475569;
+}
+
+.ensmean-empty-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e40af;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.ensmean-empty-title {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.ensmean-empty-desc {
+  margin: 0;
+  max-width: 520px;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: #64748b;
+}

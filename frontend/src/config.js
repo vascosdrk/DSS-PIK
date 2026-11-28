@@ -116,6 +116,7 @@ export const API_ENDPOINTS = {
   RAINFALL_INPUT_COMMIT: `${API_BASE_URL}/api/v1/rainfall/input/commit`,
 
   // DSS-PIK Data Center & Download Endpoints
+  EXPORT_AVAILABILITY: `${API_BASE_URL}/api/v1/export/availability`,
   STATION_INFO: (stationId) =>
     `${API_BASE_URL}/api/v1/stations/${encodeURIComponent(stationId)}/info`,
   SPI_DATA: (params = {}) => {
@@ -221,6 +222,59 @@ export const API_ENDPOINTS = {
     const qs = q.toString();
     return `${API_BASE_URL}/api/v1/forecast/vintages${qs ? `?${qs}` : ''}`;
   },
+
+  // ECMWF Deterministic (ENSMEAN) Multi-Vintage Endpoints (Phase 3/4)
+  DETERMINISTIC_PERIODS: `${API_BASE_URL}/api/v1/forecast/deterministic/periods`,
+  DETERMINISTIC_DATA: (params = {}) => {
+    const q = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') q.append(k, v);
+    });
+    const qs = q.toString();
+    return `${API_BASE_URL}/api/v1/forecast/deterministic/data${qs ? `?${qs}` : ''}`;
+  },
+  DETERMINISTIC_VINTAGES: (params = {}) => {
+    const q = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') q.append(k, v);
+    });
+    const qs = q.toString();
+    return `${API_BASE_URL}/api/v1/forecast/deterministic/vintages${qs ? `?${qs}` : ''}`;
+  },
+  DETERMINISTIC_VINTAGE_DETAIL: (issueDate, params = {}) => {
+    const q = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') q.append(k, v);
+    });
+    const qs = q.toString();
+    return `${API_BASE_URL}/api/v1/forecast/deterministic/vintages/${encodeURIComponent(issueDate)}${qs ? `?${qs}` : ''}`;
+  },
+  DETERMINISTIC_COMPLETENESS: (params = {}) => {
+    const q = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') q.append(k, v);
+    });
+    const qs = q.toString();
+    return `${API_BASE_URL}/api/v1/forecast/deterministic/completeness${qs ? `?${qs}` : ''}`;
+  },
+  DETERMINISTIC_HISTORY: (params = {}) => {
+    const q = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') q.append(k, v);
+    });
+    const qs = q.toString();
+    return `${API_BASE_URL}/api/v1/forecast/deterministic/history${qs ? `?${qs}` : ''}`;
+  },
+  DETERMINISTIC_DOWNLOAD: (params = {}) => {
+    const q = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') q.append(k, v);
+    });
+    const qs = q.toString();
+    return `${API_BASE_URL}/api/v1/forecast/deterministic/download${qs ? `?${qs}` : ''}`;
+  },
+  INGESTION_DETERMINISTIC_VOID: `${API_BASE_URL}/api/v1/ingestion/deterministic/void`,
+  INGESTION_DETERMINISTIC_REACTIVATE: `${API_BASE_URL}/api/v1/ingestion/deterministic/reactivate`,
 
   // Regional Warning Management & SIH3 Publication Endpoints
   REGIONAL_WARNINGS_MAPPING: `${API_BASE_URL}/api/v1/warnings/regional/mapping`,

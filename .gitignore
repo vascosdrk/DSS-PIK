@@ -54,6 +54,7 @@ releases/
 # Phase 8.4 — GitHub Security Exclusions (never commit dumps, operational data, or image archives)
 .env.production
 *.sql
+!database/migrations/*.sql
 *.sql.gz
 *.tar.gz
 *.zip

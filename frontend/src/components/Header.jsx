@@ -80,7 +80,7 @@ export default function Header({
             aria-selected={activeTab === 'kamus'}
           >
             <BookOpen size={15} />
-            <span>Kamus Istilah</span>
+            <span>Kamus</span>
           </button>
         </nav>
       </div>

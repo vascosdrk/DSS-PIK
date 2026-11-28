@@ -241,10 +241,10 @@ export default function SpiDataTable({ refreshTrigger = 0, onOpenDownload, onOpe
               type="button"
               className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg border border-slate-300 transition"
               onClick={() => onOpenManagement('CORRECTIONS', 'SPI')}
-              title="Buka panel kelola & void SPI"
+              title="Buka panel Kelola Data SPI (Pembatalan Data)"
             >
               <Edit3 size={13} />
-              <span>Kelola / Pembatalan SPI</span>
+              <span>Kelola Data SPI</span>
             </button>
           )}
         </div>

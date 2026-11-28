@@ -121,6 +121,21 @@ export default function OperationalDataManager({ initialTab = 'STORAGE', initial
   const [voidProbOperator, setVoidProbOperator] = useState('OPERATOR_BMKG');
   const [voidProbLoading, setVoidProbLoading] = useState(false);
 
+  // Sub-Form E: Soft-Void & Reaktivasi ENSMEAN (Terisolasi dari Probabilitas)
+  const [detActionMode, setDetActionMode] = useState('VOID'); // 'VOID' | 'REACTIVATE'
+  const [detIssueDate, setDetIssueDate] = useState('');
+  const [detResolution, setDetResolution] = useState('DASARIAN');
+  const [detTargetPeriod, setDetTargetPeriod] = useState('');
+  const [detStationId, setDetStationId] = useState('');
+  const [detReason, setDetReason] = useState('');
+  const [detConfirmChecked, setDetConfirmChecked] = useState(false);
+  const [detOperator] = useState('OPERATOR_BMKG');
+  const [detLoading, setDetLoading] = useState(false);
+  const [detHistory, setDetHistory] = useState([]);
+  const [loadingDetHistory, setLoadingDetHistory] = useState(false);
+  const [detVintages, setDetVintages] = useState([]);
+  const [loadingDetVintages, setLoadingDetVintages] = useState(false);
+
   // Action Success/Error Notification State
   const [actionAlert, setActionAlert] = useState(null); // { type: 'success' | 'error', message: string }
 
@@ -236,6 +251,37 @@ export default function OperationalDataManager({ initialTab = 'STORAGE', initial
     }
   }, []);
 
+  // Fetch Deterministic (ENSMEAN) Vintages & History
+  const fetchDeterministicVintages = useCallback(async () => {
+    setLoadingDetVintages(true);
+    try {
+      const res = await authFetch(API_ENDPOINTS.DETERMINISTIC_VINTAGES({ include_voided: true }));
+      if (res.ok) {
+        const data = await res.json();
+        setDetVintages(data.vintages || []);
+      }
+    } catch (e) {
+      console.error('Failed to fetch ENSMEAN vintages:', e);
+    } finally {
+      setLoadingDetVintages(false);
+    }
+  }, []);
+
+  const fetchDeterministicHistory = useCallback(async () => {
+    setLoadingDetHistory(true);
+    try {
+      const res = await authFetch(API_ENDPOINTS.DETERMINISTIC_HISTORY({ limit: 30 }));
+      if (res.ok) {
+        const data = await res.json();
+        setDetHistory(data.history || []);
+      }
+    } catch (e) {
+      console.error('Failed to fetch ENSMEAN history:', e);
+    } finally {
+      setLoadingDetHistory(false);
+    }
+  }, []);
+
   // Initial & Refresh Load
   const refreshAll = useCallback(() => {
     fetchSummary();
@@ -244,7 +290,18 @@ export default function OperationalDataManager({ initialTab = 'STORAGE', initial
     fetchVintages();
     fetchMasterStations();
     fetchCorrectionLogs();
-  }, [fetchSummary, fetchStatus, fetchBatches, fetchVintages, fetchMasterStations, fetchCorrectionLogs]);
+    fetchDeterministicVintages();
+    fetchDeterministicHistory();
+  }, [
+    fetchSummary,
+    fetchStatus,
+    fetchBatches,
+    fetchVintages,
+    fetchMasterStations,
+    fetchCorrectionLogs,
+    fetchDeterministicVintages,
+    fetchDeterministicHistory,
+  ]);
 
   useEffect(() => {
     refreshAll();
@@ -468,6 +525,76 @@ export default function OperationalDataManager({ initialTab = 'STORAGE', initial
     }
   };
 
+  // Sub-Form E: Soft-Void atau Reaktivasi ENSMEAN (Terisolasi dari Probabilitas)
+  const handleDeterministicVoidOrReactivate = async (e) => {
+    e.preventDefault();
+    if (!detIssueDate || !detReason.trim()) {
+      setActionAlert({
+        type: 'error',
+        message: 'Tanggal Issue (issue_date) dan Alasan wajib diisi untuk pengelolaan vintage deterministik.',
+      });
+      return;
+    }
+    if (!detConfirmChecked) {
+      setActionAlert({
+        type: 'error',
+        message: 'Centang konfirmasi terlebih dahulu sebelum menjalankan Pembatalan / Aktifkan Kembali Vintage.',
+      });
+      return;
+    }
+
+    setDetLoading(true);
+    try {
+      const endpoint =
+        detActionMode === 'REACTIVATE'
+          ? API_ENDPOINTS.INGESTION_DETERMINISTIC_REACTIVATE
+          : API_ENDPOINTS.INGESTION_DETERMINISTIC_VOID;
+
+      const res = await authFetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          issue_date: detIssueDate.trim(),
+          forecast_resolution: detResolution,
+          target_period: detTargetPeriod.trim() || null,
+          station_id: detStationId.trim() || null,
+          reason: detReason.trim(),
+          operator: detOperator || 'OPERATOR_BMKG',
+        }),
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(
+          errJson.detail || `HTTP ${res.status}: Operasi ${detActionMode} data deterministik gagal`
+        );
+      }
+
+      const resData = await res.json();
+      const affected =
+        detActionMode === 'REACTIVATE'
+          ? resData.records_reactivated ?? 0
+          : resData.records_voided ?? 0;
+      setActionAlert({
+        type: 'success',
+        message:
+          detActionMode === 'REACTIVATE'
+            ? `Aktifkan Kembali Vintage Deterministik (${detResolution}, issue ${detIssueDate}) berhasil: ${affected} rekor diaktifkan kembali (Audit: ${resData.audit_batch_id}).`
+            : `Batalkan Vintage Deterministik (${detResolution}, issue ${detIssueDate}) berhasil: ${affected} rekor dinonaktifkan tanpa memengaruhi Probabilitas (Audit: ${resData.audit_batch_id}).`,
+      });
+      setDetReason('');
+      setDetConfirmChecked(false);
+      refreshAll();
+    } catch (err) {
+      setActionAlert({
+        type: 'error',
+        message: err.message || 'Gagal memproses tindakan data deterministik.',
+      });
+    } finally {
+      setDetLoading(false);
+    }
+  };
+
   return (
     <div className="operational-management-container space-y-5">
       {/* 1. HEADER BANNER */}
@@ -637,7 +764,7 @@ export default function OperationalDataManager({ initialTab = 'STORAGE', initial
             onClick={() => setManagerTab('CORRECTIONS')}
           >
             <Edit3 size={15} className={managerTab === 'CORRECTIONS' ? 'text-emerald-700' : 'text-slate-400'} />
-            <span>3. Koreksi &amp; Pembatalan Rekaman</span>
+            <span>3. Kelola Data (Koreksi &amp; Pembatalan)</span>
           </button>
 
           <button
@@ -650,7 +777,7 @@ export default function OperationalDataManager({ initialTab = 'STORAGE', initial
             onClick={() => setManagerTab('VINTAGES')}
           >
             <TrendingUp size={15} className={managerTab === 'VINTAGES' ? 'text-emerald-700' : 'text-slate-400'} />
-            <span>4. Vintage Prakiraan ECMWF ({vintages.length})</span>
+            <span>4. Kelola Vintage ECMWF ({vintages.length})</span>
           </button>
         </div>
 
@@ -894,9 +1021,9 @@ export default function OperationalDataManager({ initialTab = 'STORAGE', initial
                   <strong>Pusat Audit Koreksi &amp; Pembatalan Rekaman BMKG:</strong> Seluruh tindakan koreksi dan pembatalan (void) direkam ke dalam audit log sistem dengan identitas operator, stempel waktu WIB, dan alasan penyesuaian.
                 </div>
               </div>
-              <div className="flex items-center space-x-1.5 shrink-0">
+              <div className="flex items-center flex-wrap gap-1.5 shrink-0">
                 <span className="text-[11px] font-semibold text-amber-800">Filter Dataset:</span>
-                {['ALL', 'CURAH_HUJAN', 'SPI', 'PROBABILITAS'].map((ds) => (
+                {['ALL', 'CURAH_HUJAN', 'SPI', 'PROBABILITAS', 'ENSMEAN'].map((ds) => (
                   <button
                     key={ds}
                     type="button"
@@ -907,7 +1034,15 @@ export default function OperationalDataManager({ initialTab = 'STORAGE', initial
                         : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
                     }`}
                   >
-                    {ds === 'ALL' ? 'Semua' : ds === 'CURAH_HUJAN' ? 'Curah Hujan' : ds === 'SPI' ? 'SPI Parquet' : 'Probabilitas'}
+                    {ds === 'ALL'
+                      ? 'Semua'
+                      : ds === 'CURAH_HUJAN'
+                        ? 'Kelola Data Curah Hujan'
+                        : ds === 'SPI'
+                          ? 'Kelola Data SPI'
+                          : ds === 'PROBABILITAS'
+                            ? 'ECMWF Probabilitas (%)'
+                            : 'ECMWF Deterministik (mm)'}
                   </button>
                 ))}
               </div>
@@ -933,8 +1068,8 @@ export default function OperationalDataManager({ initialTab = 'STORAGE', initial
                     <Activity size={16} />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-slate-800">3. Pembatalan (Void) Rekor SPI Parquet</h4>
-                    <p className="text-[11px] text-slate-500">Nullify rekor SPI terisolasi per timescale 30D / 90D</p>
+                    <h4 className="text-xs font-bold text-slate-800">Kelola Data SPI — Pembatalan Data</h4>
+                    <p className="text-[11px] text-slate-500">Pembatalan rekor SPI terisolasi per skala 30D / 90D</p>
                   </div>
                 </div>
 
@@ -1014,7 +1149,7 @@ export default function OperationalDataManager({ initialTab = 'STORAGE', initial
                       disabled={voidSpiLoading}
                       className="px-3 py-1.5 bg-indigo-700 hover:bg-indigo-800 text-white rounded text-xs font-semibold transition disabled:opacity-50"
                     >
-                      {voidSpiLoading ? 'Membatalkan...' : 'Void Rekor SPI'}
+                      {voidSpiLoading ? 'Membatalkan...' : 'Batalkan Data SPI'}
                     </button>
                   </div>
                 </form>
@@ -1029,8 +1164,8 @@ export default function OperationalDataManager({ initialTab = 'STORAGE', initial
                     <TrendingUp size={16} />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-slate-800">4. Pembatalan Snapshot Probabilitas ECMWF</h4>
-                    <p className="text-[11px] text-slate-500">Anulir batch prakiraan ECMWF per tanggal issue &amp; target</p>
+                    <h4 className="text-xs font-bold text-slate-800">Kelola Prakiraan ECMWF — Batalkan Vintage Probabilitas (%)</h4>
+                    <p className="text-[11px] text-slate-500">Batalkan penerbitan (vintage) probabilitas per tanggal issue &amp; periode target</p>
                   </div>
                 </div>
 
@@ -1088,7 +1223,7 @@ export default function OperationalDataManager({ initialTab = 'STORAGE', initial
                       disabled={voidProbLoading}
                       className="px-3 py-1.5 bg-purple-700 hover:bg-purple-800 text-white rounded text-xs font-semibold transition disabled:opacity-50"
                     >
-                      {voidProbLoading ? 'Membatalkan...' : 'Void Snapshot Probabilitas'}
+                      {voidProbLoading ? 'Membatalkan...' : 'Batalkan Vintage Probabilitas'}
                     </button>
                   </div>
                 </form>
@@ -1096,15 +1231,219 @@ export default function OperationalDataManager({ initialTab = 'STORAGE', initial
               )}
             </div>
 
+            {/* SUB-FORM 5: SOFT-VOID & REAKTIVASI ENSMEAN TERISOLASI */}
+            {(correctionDatasetFilter === 'ALL' || correctionDatasetFilter === 'ENSMEAN') && (
+              <div className="bg-white border border-sky-200 rounded-xl p-4 shadow-xs space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
+                  <div className="flex items-center space-x-2">
+                    <div className="p-1.5 bg-sky-100 rounded text-sky-800">
+                      <CloudRain size={16} />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-800">
+                        Kelola Prakiraan ECMWF — Kelola Vintage Deterministik (mm)
+                      </h4>
+                      <p className="text-[11px] text-slate-500">
+                        Batalkan atau aktifkan kembali vintage deterministik (mm) tanpa memengaruhi data Probabilitas (%).
+                      </p>
+                    </div>
+                  </div>
+                  <div className="inline-flex rounded-lg border border-slate-300 overflow-hidden text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setDetActionMode('VOID')}
+                      className={`px-3 py-1 font-semibold transition ${
+                        detActionMode === 'VOID'
+                          ? 'bg-rose-700 text-white'
+                          : 'bg-white text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      Batalkan Vintage
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDetActionMode('REACTIVATE')}
+                      className={`px-3 py-1 font-semibold transition ${
+                        detActionMode === 'REACTIVATE'
+                          ? 'bg-emerald-700 text-white'
+                          : 'bg-white text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      Aktifkan Kembali Vintage
+                    </button>
+                  </div>
+                </div>
+
+                <form onSubmit={handleDeterministicVoidOrReactivate} className="space-y-3 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                    <div>
+                      <label className="block text-slate-600 font-medium mb-1">Tanggal Issue (Wajib):</label>
+                      <input
+                        type="date"
+                        value={detIssueDate}
+                        onChange={(e) => setDetIssueDate(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 font-mono text-xs"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-600 font-medium mb-1">Resolusi (Wajib):</label>
+                      <select
+                        value={detResolution}
+                        onChange={(e) => setDetResolution(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 text-xs font-semibold"
+                      >
+                        <option value="DASARIAN">DASARIAN</option>
+                        <option value="BULANAN">BULANAN</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-slate-600 font-medium mb-1">Periode Target (Opsional):</label>
+                      <input
+                        type="text"
+                        placeholder={detResolution === 'BULANAN' ? 'Contoh: 2026-11' : 'Contoh: 2026-11-das1'}
+                        value={detTargetPeriod}
+                        onChange={(e) => setDetTargetPeriod(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 font-mono text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-600 font-medium mb-1">ID Pos (Opsional):</label>
+                      <input
+                        type="text"
+                        placeholder="Kosongkan = semua pos"
+                        value={detStationId}
+                        onChange={(e) => setDetStationId(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 font-mono text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-600 font-medium mb-1">
+                      Alasan {detActionMode === 'REACTIVATE' ? 'Aktifkan Kembali' : 'Pembatalan'} Vintage (Wajib untuk Audit):
+                    </label>
+                    <input
+                      type="text"
+                      placeholder={
+                        detActionMode === 'REACTIVATE'
+                          ? 'Contoh: Verifikasi ulang mengonfirmasi data deterministik valid'
+                          : 'Contoh: Workbook salah kolom / menunggu revisi'
+                      }
+                      value={detReason}
+                      onChange={(e) => setDetReason(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 text-xs"
+                      required
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                    <label className="inline-flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={detConfirmChecked}
+                        onChange={(e) => setDetConfirmChecked(e.target.checked)}
+                      />
+                      <span>
+                        Saya mengonfirmasi tindakan{' '}
+                        <strong>{detActionMode === 'REACTIVATE' ? 'Aktifkan Kembali Vintage' : 'Batalkan Vintage'}</strong>{' '}
+                        ini (terisolasi dari data Probabilitas).
+                      </span>
+                    </label>
+                    <button
+                      type="submit"
+                      disabled={detLoading || !detConfirmChecked || !detIssueDate || !detReason.trim()}
+                      className={`px-3.5 py-1.5 text-white rounded text-xs font-semibold transition disabled:opacity-50 ${
+                        detActionMode === 'REACTIVATE'
+                          ? 'bg-emerald-700 hover:bg-emerald-800'
+                          : 'bg-rose-700 hover:bg-rose-800'
+                      }`}
+                    >
+                      {detLoading
+                        ? 'Memproses...'
+                        : detActionMode === 'REACTIVATE'
+                          ? 'Aktifkan Kembali Vintage'
+                          : 'Batalkan Vintage'}
+                    </button>
+                  </div>
+                </form>
+
+                {/* Riwayat Pengelolaan Vintage Deterministik */}
+                <div className="pt-2 border-t border-slate-100">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                      Riwayat Pengelolaan Vintage Deterministik ({detHistory.length})
+                    </span>
+                    <button
+                      type="button"
+                      onClick={fetchDeterministicHistory}
+                      disabled={loadingDetHistory}
+                      className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded text-slate-700 text-[11px] font-medium inline-flex items-center gap-1"
+                    >
+                      <RefreshCw size={11} className={loadingDetHistory ? 'animate-spin' : ''} />
+                      <span>Segarkan</span>
+                    </button>
+                  </div>
+                  <div className="overflow-x-auto border border-slate-200 rounded-lg max-h-52">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200 sticky top-0">
+                        <tr>
+                          <th className="py-1.5 px-2.5">Waktu</th>
+                          <th className="py-1.5 px-2.5">Tipe</th>
+                          <th className="py-1.5 px-2.5">Batch / Berkas</th>
+                          <th className="py-1.5 px-2.5 text-center">Jumlah</th>
+                          <th className="py-1.5 px-2.5">Status</th>
+                          <th className="py-1.5 px-2.5">Alasan &amp; Operator</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200">
+                        {detHistory.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="py-4 text-center text-slate-400">
+                              Belum ada riwayat ingestion/void/reaktivasi data deterministik tercatat.
+                            </td>
+                          </tr>
+                        ) : (
+                          detHistory.map((h, idx) => (
+                            <tr key={h.batch_id || idx} className="hover:bg-slate-50">
+                              <td className="py-1.5 px-2.5 font-mono text-[11px] text-slate-600">{h.created_at || '—'}</td>
+                              <td className="py-1.5 px-2.5 font-semibold text-[11px]">{h.data_type}</td>
+                              <td className="py-1.5 px-2.5 font-mono text-[11px] truncate max-w-[200px]" title={h.file_name || h.batch_id}>
+                                {h.file_name || h.batch_id}
+                              </td>
+                              <td className="py-1.5 px-2.5 text-center font-mono">{h.total_records ?? 0}</td>
+                              <td className="py-1.5 px-2.5">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  h.status === 'VOIDED'
+                                    ? 'bg-rose-100 text-rose-800'
+                                    : 'bg-emerald-100 text-emerald-800'
+                                }`}>
+                                  {h.status}
+                                </span>
+                              </td>
+                              <td className="py-1.5 px-2.5 text-[11px]">
+                                <div>{h.reason || '—'}</div>
+                                <div className="text-[10px] text-slate-400">Oleh: {h.operator || 'OPERATOR_BMKG'}</div>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* AUDIT LOG KOREKSI & PEMBATALAN REKAMAN */}
             <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs space-y-3">
               <div className="flex items-center justify-between">
                 <div>
                   <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                    Tabel Audit Log Koreksi &amp; Pembatalan Rekaman
+                    Riwayat dan Audit Pengelolaan Data
                   </h4>
                   <p className="text-[11px] text-slate-500">
-                    Jejak audit terpusat dari cews_rainfall_correction_log dan pembatalan SPI/Probabilitas.
+                    Jejak audit terpusat untuk Koreksi Data, Pembatalan Data, dan Pengelolaan Vintage.
                   </p>
                 </div>
                 <button
@@ -1269,6 +1608,73 @@ export default function OperationalDataManager({ initialTab = 'STORAGE', initial
                   )}
                 </tbody>
               </table>
+            </div>
+
+            {/* Daftar Vintage Deterministik (mm) */}
+            <div className="pt-4 border-t border-slate-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    Daftar Vintage Prakiraan Deterministik (mm) — ({detVintages.length})
+                  </h4>
+                  <p className="text-xs text-slate-500">
+                    Snapshot prakiraan curah hujan deterministik ECMWF yang tersimpan secara terisolasi.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={fetchDeterministicVintages}
+                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-700 text-xs font-medium inline-flex items-center space-x-1"
+                >
+                  <RefreshCw size={12} className={loadingDetVintages ? 'animate-spin' : ''} />
+                  <span>Segarkan Deterministik</span>
+                </button>
+              </div>
+
+              <div className="overflow-x-auto border border-slate-200 rounded-lg">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200">
+                    <tr>
+                      <th className="py-2 px-3">Resolusi</th>
+                      <th className="py-2 px-3">Issue Date</th>
+                      <th className="py-2 px-3">Release Group</th>
+                      <th className="py-2 px-3 text-center">Periode</th>
+                      <th className="py-2 px-3 text-center">Stasiun Aktif</th>
+                      <th className="py-2 px-3 text-center">Adjusted / Regular</th>
+                      <th className="py-2 px-3 text-center">Voided</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {loadingDetVintages ? (
+                      <tr>
+                        <td colSpan={7} className="py-6 text-center text-slate-400">
+                          Memuat vintage prakiraan deterministik...
+                        </td>
+                      </tr>
+                    ) : detVintages.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-6 text-center text-slate-400">
+                          Belum ada vintage prakiraan deterministik tersimpan di basis data lokal.
+                        </td>
+                      </tr>
+                    ) : (
+                      detVintages.map((dv, idx) => (
+                        <tr key={`${dv.issue_date}-${dv.forecast_resolution}-${idx}`} className="hover:bg-slate-50">
+                          <td className="py-2 px-3 font-semibold">{dv.forecast_resolution}</td>
+                          <td className="py-2 px-3 font-mono font-bold text-slate-800">{dv.issue_date}</td>
+                          <td className="py-2 px-3 font-mono text-[11px] text-slate-600">{dv.release_group_id || '—'}</td>
+                          <td className="py-2 px-3 text-center font-mono">{dv.target_periods_count ?? 0}</td>
+                          <td className="py-2 px-3 text-center font-mono">{dv.active_stations_count ?? 0}</td>
+                          <td className="py-2 px-3 text-center font-mono">
+                            {dv.adjusted_rows ?? 0} / {dv.regular_rows ?? 0}
+                          </td>
+                          <td className="py-2 px-3 text-center font-mono text-rose-700">{dv.voided_rows ?? 0}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
